@@ -17,14 +17,6 @@ export const champion = v.object({
   isLocked: v.optional(v.boolean()),
 })
 
-// Trait effect schema
-const traitEffect = v.object({
-  min_units: v.optional(v.number()),
-  max_units: v.optional(v.number()),
-  style_idx: v.optional(v.number()),
-  style_name: v.optional(v.string()),
-})
-
 // Trait schema based on tfttraits.json
 export const trait = v.object({
   key: v.optional(v.string()), // TFTSet16_Arcana
