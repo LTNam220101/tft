@@ -6,7 +6,7 @@ export const getChampions = internalQuery({
     },
 });
 
-export const getTraits = internalQuery({
+export const getTraits = query({
     handler: async (ctx) => {
         return await ctx.db.query("traits").collect();
     },
@@ -25,6 +25,12 @@ export const getItemsInternal = internalQuery({
 });
 export const listChampions = query({
     handler: async (ctx) => {
-        return await ctx.db.query("champions").collect();
+        const champions = await ctx.db.query("champions").collect();
+        return champions.sort((a, b) => {
+            if ((a.cost ?? 0) !== (b.cost ?? 0)) {
+                return (a.cost ?? 0) - (b.cost ?? 0);
+            }
+            return (a.name ?? "").localeCompare(b.name ?? "");
+        });
     },
 });
