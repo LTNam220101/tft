@@ -1,0 +1,20 @@
+{
+    "version": 2,
+    "public": true,
+    "cleanUrls": true,
+    "functions": {
+        "dist/server/server.js": {
+            "runtime": "vercel-node@latest"
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/assets/(.*)",
+            "destination": "/dist/client/assets/$1"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/dist/server/server.js"
+        }
+    ]
+}
