@@ -3,18 +3,18 @@
     "public": true,
     "cleanUrls": true,
     "functions": {
-        "dist/server/server.js": {
-            "runtime": "vercel-node@latest"
+        "server/server.js": {
+            "runtime": "@vercel/node"
         }
     },
     "rewrites": [
         {
             "source": "/assets/(.*)",
-            "destination": "/dist/client/assets/$1"
+            "destination": "/client/assets/$1"
         },
         {
             "source": "/(.*)",
-            "destination": "/dist/server/server.js"
+            "destination": "/server/server.js"
         }
     ]
 }
