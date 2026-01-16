@@ -258,8 +258,8 @@ function calculateTeamScoreFromCounts(
 
                 if (emblemCounts[traitId]) {
                     // Balanced: Use linear currentMinUnits to avoid over-prioritizing large milestones like A6
-                    totalScore += currentMinUnits * 60 * gap;
-                    totalScore += count * 20;
+                    totalScore += currentMinUnits * 30 * gap;
+                    totalScore += count * 5 * gap;
                 } else {
                     totalScore += currentMinUnits * 30;
                     totalScore += count * 5;
