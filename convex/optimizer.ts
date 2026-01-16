@@ -57,6 +57,16 @@ export const suggestTeams = action({
                 for (const candidate of champions) {
                     if (state.usedKeys.has(candidate.key!)) continue;
 
+                    const hasSharedTrait = candidate.traits?.some((t: any) =>
+                        state.nativeCounts[t.id] !== undefined || emblemCounts[t.id] !== undefined
+                    );
+
+                    // Filter: candidate must share at least 1 trait with current team/emblems
+                    // if it's not the very first champion (and no emblems).
+                    if (state.champions.length > 0 || Object.keys(emblemCounts).length > 0) {
+                        if (!hasSharedTrait) continue;
+                    }
+
                     const newNativeCounts = { ...state.nativeCounts };
                     if (candidate.traits) {
                         for (const t of candidate.traits) {
@@ -150,6 +160,14 @@ export const suggestWorldRunes = action({
                 for (const state of beam) {
                     for (const candidate of champions) {
                         if (state.usedKeys.has(candidate.key!)) continue;
+
+                        const hasSharedTrait = candidate.traits?.some((t: any) =>
+                            state.nativeCounts[t.id] !== undefined || emblemCounts[t.id] !== undefined
+                        );
+
+                        if (state.champions.length > 0 || Object.keys(emblemCounts).length > 0) {
+                            if (!hasSharedTrait) continue;
+                        }
 
                         const newNativeCounts = { ...state.nativeCounts };
                         if (candidate.traits) {
@@ -248,7 +266,7 @@ function calculateTeamScoreFromCounts(
         if (activeEffects.length > 0) {
             if (mode === "wide") {
                 if (traitDef.unique) totalScore += 30;
-                totalScore += 150 + activeEffects.length * 30;
+                totalScore += 50 + activeEffects.length * 30;
             } else {
                 if (traitDef.unique) totalScore += 30;
 
@@ -280,18 +298,18 @@ function calculateTeamScoreFromCounts(
                 const active = traitDef.effects?.some((eff: any) => count >= eff.min_units);
                 if (active) {
                     regionCount++;
-                    totalScore += 100;
+                    totalScore += 50;
                 }
             }
         }
-        totalScore += (regionCount < 4) ? -3000 : 500;
+        totalScore += (regionCount < 4) ? -4000 * (4 - regionCount) : 1000 * regionCount;
     }
 
     if (teamKeys.has("TFT16_Tibber") && !teamKeys.has("TFT16_Annie")) totalScore -= 2000;
     else if (teamKeys.has("TFT16_Tibber") && teamKeys.has("TFT16_Annie")) totalScore += 300;
 
-    if (teamKeys.has("TFT16_Yone") && !teamKeys.has("TFT16_Yasuo")) totalScore -= 300;
-    else if (teamKeys.has("TFT16_Yone") && teamKeys.has("TFT16_Yasuo")) totalScore += 300;
+    if (teamKeys.has("TFT16_Yone") && !teamKeys.has("TFT16_Yasuo")) totalScore -= 1000;
+    else if (teamKeys.has("TFT16_Yone") && teamKeys.has("TFT16_Yasuo")) totalScore += 1000;
 
     // Cost Penalty
     for (const c of team) {
