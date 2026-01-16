@@ -295,7 +295,7 @@ function calculateTeamScoreFromCounts(
 
     // Cost Penalty
     for (const c of team) {
-        totalScore -= (c.cost || 0) * (c.cost || 0) * 2;
+        totalScore += (c.cost || 0) * (c.cost || 0) * 2;
     }
 
     return totalScore;
