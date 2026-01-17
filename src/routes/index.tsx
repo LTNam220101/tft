@@ -130,7 +130,7 @@ function HomeComponent() {
 
             <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Selection Column */}
-                <div className="lg:col-span-1 space-y-8 h-screen overflow-scroll sticky top-0">
+                <div className="lg:col-span-1 space-y-8 h-screen overflow-scroll lg:sticky top-0 custom-scrollbar">
                     <div className="bg-[#16161f] p-6 rounded-2xl border border-white/5 shadow-2xl space-y-8">
                         <section>
                             <div className="flex justify-between items-center mb-4">

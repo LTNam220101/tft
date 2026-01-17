@@ -64,7 +64,8 @@ export const suggestTeams = action({
                     // Filter: candidate must share at least 1 trait with current team/emblems
                     // if it's not the very first champion (and no emblems).
                     if (state.champions.length > 0 || Object.keys(emblemCounts).length > 0) {
-                        if (!hasSharedTrait) continue;
+                        const isComplete = isTeamComplete(state.nativeCounts, emblemCounts, traitMap, teamSize);
+                        if (!hasSharedTrait && !isComplete) continue;
                     }
 
                     const newNativeCounts = { ...state.nativeCounts };
@@ -166,7 +167,8 @@ export const suggestWorldRunes = action({
                         );
 
                         if (state.champions.length > 0 || Object.keys(emblemCounts).length > 0) {
-                            if (!hasSharedTrait) continue;
+                            const isComplete = isTeamComplete(state.nativeCounts, emblemCounts, traitMap, size);
+                            if (!hasSharedTrait && !isComplete) continue;
                         }
 
                         const newNativeCounts = { ...state.nativeCounts };
@@ -265,22 +267,29 @@ function calculateTeamScoreFromCounts(
 
         if (activeEffects.length > 0) {
             if (mode === "wide") {
-                if (traitDef.unique) totalScore += 30;
-                totalScore += 50 + activeEffects.length * 30;
+                if (traitDef.unique) {
+                    totalScore += 30;
+                }
+                else {
+                    totalScore += 50 + activeEffects.length * 30;
+                }
             } else {
-                if (traitDef.unique) totalScore += 30;
+                if (traitDef.unique) {
+                    totalScore += 30;
+                }
+                else {
+                    const currentMinUnits = activeEffects[activeEffects.length - 1].min_units;
+                    const prevMinUnits = activeEffects.length > 1 ? activeEffects[activeEffects.length - 2].min_units : 0;
+                    const gap = currentMinUnits - prevMinUnits;
 
-                const currentMinUnits = activeEffects[activeEffects.length - 1].min_units;
-                const prevMinUnits = activeEffects.length > 1 ? activeEffects[activeEffects.length - 2].min_units : 0;
-                const gap = currentMinUnits - prevMinUnits;
-
-                if (emblemCounts[traitId]) {
-                    // Balanced: Use linear currentMinUnits to avoid over-prioritizing large milestones like A6
-                    totalScore += currentMinUnits * 30 * gap;
-                    totalScore += count * 5 * gap;
-                } else {
-                    totalScore += currentMinUnits * 30;
-                    totalScore += count * 5;
+                    if (emblemCounts[traitId]) {
+                        // Balanced: Use linear currentMinUnits to avoid over-prioritizing large milestones like A6
+                        totalScore += currentMinUnits * 30 * gap;
+                        totalScore += count * 5 * gap;
+                    } else {
+                        totalScore += currentMinUnits * 30;
+                        totalScore += count * 5;
+                    }
                 }
             }
         } else if (emblemCounts[traitId]) {
@@ -375,6 +384,37 @@ function countActiveRegionsFromCounts(
         }
     }
     return regionCount;
+}
+
+function isTeamComplete(
+    nativeCounts: Record<string, number>,
+    emblemCounts: Record<string, number>,
+    traitMap: Map<string, any>,
+    teamSize: number
+) {
+    const rawTraitCounts: Record<string, number> = { ...nativeCounts };
+    for (const [traitId, count] of Object.entries(emblemCounts)) {
+        const native = nativeCounts[traitId] || 0;
+        const availableHolders = teamSize - native;
+        rawTraitCounts[traitId] = native + Math.min(count, availableHolders);
+    }
+
+    for (const [traitId, count] of Object.entries(rawTraitCounts)) {
+        if (count === 0) continue;
+        const traitDef = traitMap.get(traitId);
+        if (!traitDef) continue;
+
+        if (traitDef.unique) {
+            // Unique traits are complete at 1 (some might be different but usually 1)
+            // If they are > 0, we assume they are "complete" for the sake of branching
+            continue;
+        }
+
+        const effects = traitDef.effects || [];
+        const isAtMilestone = effects.some((eff: any) => count === eff.min_units);
+        if (!isAtMilestone) return false;
+    }
+    return true;
 }
 
 function getActiveTraitsFromCounts(
