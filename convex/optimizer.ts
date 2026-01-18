@@ -47,7 +47,7 @@ export const suggestTeams = action({
         }];
         beam[0].score = calculateTeamScoreFromCounts(beam[0].nativeCounts, lockedInChamps.length, emblemCounts, traitMap, mode, beam[0].champions);
 
-        const beamWidth = 30;
+        const beamWidth = 60;
 
         for (let step = lockedInChamps.length; step < teamSize; step++) {
             const nextCandidates: any[] = [];
@@ -268,32 +268,26 @@ function calculateTeamScoreFromCounts(
         if (activeEffects.length > 0) {
             if (mode === "wide") {
                 if (traitDef.unique) {
-                    totalScore += 30;
+                    totalScore += 1;
                 }
                 else {
-                    totalScore += 50 + activeEffects.length * 30;
+                    totalScore += 5;
                 }
             } else {
                 if (traitDef.unique) {
-                    totalScore += 30;
+                    totalScore += 1;
                 }
                 else {
                     const currentMinUnits = activeEffects[activeEffects.length - 1].min_units;
-                    const prevMinUnits = activeEffects.length > 1 ? activeEffects[activeEffects.length - 2].min_units : 0;
-                    const gap = currentMinUnits - prevMinUnits;
-
                     if (emblemCounts[traitId]) {
-                        // Balanced: Use linear currentMinUnits to avoid over-prioritizing large milestones like A6
-                        totalScore += currentMinUnits * 30 * gap;
-                        totalScore += count * 5 * gap;
+                        totalScore += currentMinUnits * currentMinUnits * currentMinUnits;
                     } else {
-                        totalScore += currentMinUnits * 30;
-                        totalScore += count * 5;
+                        totalScore += currentMinUnits * currentMinUnits;
                     }
                 }
             }
         } else if (emblemCounts[traitId]) {
-            totalScore -= 500;
+            totalScore -= 100;
         }
     }
 
@@ -307,22 +301,21 @@ function calculateTeamScoreFromCounts(
                 const active = traitDef.effects?.some((eff: any) => count >= eff.min_units);
                 if (active) {
                     regionCount++;
-                    totalScore += 50;
                 }
             }
         }
-        totalScore += (regionCount < 4) ? -4000 * (4 - regionCount) : 1000 * regionCount;
+        totalScore += (regionCount < 4) ? -100 * (4 - regionCount) : 100 * regionCount;
     }
 
-    if (teamKeys.has("TFT16_Tibber") && !teamKeys.has("TFT16_Annie")) totalScore -= 2000;
-    else if (teamKeys.has("TFT16_Tibber") && teamKeys.has("TFT16_Annie")) totalScore += 300;
+    if (teamKeys.has("TFT16_Tibber") && !teamKeys.has("TFT16_Annie")) totalScore -= 100;
+    else if (teamKeys.has("TFT16_Tibber") && teamKeys.has("TFT16_Annie")) totalScore += 50;
 
-    if (teamKeys.has("TFT16_Yone") && !teamKeys.has("TFT16_Yasuo")) totalScore -= 1000;
-    else if (teamKeys.has("TFT16_Yone") && teamKeys.has("TFT16_Yasuo")) totalScore += 1000;
+    if (teamKeys.has("TFT16_Yone") && !teamKeys.has("TFT16_Yasuo")) totalScore -= 100;
+    else if (teamKeys.has("TFT16_Yone") && teamKeys.has("TFT16_Yasuo")) totalScore += 100;
 
     // Cost Penalty
     for (const c of team) {
-        totalScore += (c.cost || 0) * (c.cost || 0) * 2;
+        totalScore += c.cost;
     }
 
     return totalScore;
