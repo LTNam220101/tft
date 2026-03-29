@@ -1,0 +1,106 @@
+# Push lên master → deploy Convex production → build/push Docker Hub → SSH VPS pull & chạy container
+#
+# GitHub Secrets cần cấu hình (Settings → Secrets and variables → Actions):
+#   CONVEX_DEPLOY_KEY     — Deploy key từ Convex Dashboard (Settings → Deploy Key, production)
+#   VITE_CONVEX_URL       — URL deployment production, ví dụ https://your-deployment.convex.cloud
+#   DOCKERHUB_USERNAME    — User Docker Hub
+#   DOCKERHUB_TOKEN       — Access Token (không dùng mật khẩu tài khoản)
+#   SERVER_APP_PATH       — Path to the app on the server
+#   VPS_HOST              — Hostname hoặc IP VPS
+#   VPS_USER              — User SSH (thường là root hoặc ubuntu)
+#   VPS_SSH_KEY           — Private key SSH (toàn bộ nội dung, -----BEGIN ... END-----)
+#
+# Chỉnh tên image / container / cổng ở khối env bên dưới nếu cần.
+
+name: Deploy (Convex + Docker + VPS)
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: deploy-master-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_REPO_NAME: tft
+  VPS_CONTAINER_NAME: tft-fe
+  VPS_APP_PORT: "3000"
+
+jobs:
+  convex-deploy:
+    name: Deploy Convex (production)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Convex deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex deploy
+
+  docker-push:
+    name: Build & push Docker image
+    needs: convex-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        run: |
+          USER="${{ secrets.DOCKERHUB_USERNAME }}"
+          REPO="${DOCKER_REPO_NAME}"
+          echo "image=${USER}/${REPO}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          build-args: |
+            VITE_CONVEX_URL=${{ secrets.VITE_CONVEX_URL }}
+
+  vps-deploy:
+    name: Deploy on VPS
+    needs: docker-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull & run container
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.SERVER_APP_PATH }}
+            IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO_NAME }}:latest"
+            docker pull "$IMAGE"
+            docker stop "${{ env.VPS_CONTAINER_NAME }}" 2>/dev/null || true
+            docker rm "${{ env.VPS_CONTAINER_NAME }}" 2>/dev/null || true
+            docker run -d \
+              --name "${{ env.VPS_CONTAINER_NAME }}" \
+              --restart unless-stopped \
+              -p "${{ env.VPS_APP_PORT }}:3000" \
+              "$IMAGE"
