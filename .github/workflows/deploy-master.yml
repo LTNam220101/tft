@@ -26,7 +26,6 @@ concurrency:
 env:
   DOCKER_REPO_NAME: tft
   VPS_CONTAINER_NAME: tft-fe
-  VPS_APP_PORT: "3000"
 
 jobs:
   convex-deploy:
@@ -102,5 +101,5 @@ jobs:
             docker run -d \
               --name "${{ env.VPS_CONTAINER_NAME }}" \
               --restart unless-stopped \
-              -p "${{ env.VPS_APP_PORT }}:3000" \
+              --network proxy \
               "$IMAGE"
