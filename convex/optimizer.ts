@@ -62,6 +62,7 @@ export const suggestTeams = action({
             mode,
             beam[0].champions,
             ACTIVE_SET_KEY,
+            teamSize,
         );
 
         const beamWidth = 60;
@@ -107,6 +108,7 @@ export const suggestTeams = action({
                         mode,
                         newTeam,
                         ACTIVE_SET_KEY,
+                        teamSize,
                     );
 
                     nextCandidates.push({
@@ -278,6 +280,10 @@ function getNativeCounts(team: any[]) {
     return nativeCounts;
 }
 
+/**
+ * @param teamSize Current roster length (beam step) — used for emblem/trait slot math.
+ * @param targetTeamSize User’s requested final team size — only this controls 4★/5★ cost penalties.
+ */
 function calculateTeamScoreFromCounts(
     nativeCounts: Record<string, number>,
     teamSize: number,
@@ -286,6 +292,7 @@ function calculateTeamScoreFromCounts(
     mode: "wide" | "deep",
     team: any[],
     setKey: string,
+    targetTeamSize: number,
 ) {
     let totalScore = 0;
     const rawTraitCounts: Record<string, number> = { ...nativeCounts };
@@ -336,6 +343,18 @@ function calculateTeamScoreFromCounts(
         totalScore += c.cost;
     }
 
+    // Cost-tier penalty only when optimizing *for* that final board size (not at intermediate beam steps).
+    if (targetTeamSize === 7) {
+        for (const c of team) {
+            const cost = c.cost ?? 0;
+            if (cost === 5) totalScore -= 10;
+            else if (cost === 4) totalScore -= 5;
+        }
+    } else if (targetTeamSize === 8) {
+        for (const c of team) {
+            if ((c.cost ?? 0) === 5) totalScore -= 5;
+        }
+    }
     return totalScore;
 }
 
