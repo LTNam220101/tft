@@ -461,10 +461,13 @@ function getActiveTraitsFromCounts(
                 unique: !!traitDef.unique,
                 isRegion: !!traitDef.isRegion,
                 iconPath: traitDef.iconPath,
+                description: traitDef.description,
+                innateConstants: traitDef.innateConstants,
                 tier: activeMilestones.length,
                 totalTiers: traitDef.effects.length,
                 currentMilestone,
                 allMilestones: traitDef.effects.map((e: any) => e.min_units),
+                effects: traitDef.effects,
             });
         }
     }

@@ -26,6 +26,8 @@ export const trait = v.object({
   name: v.optional(v.string()),
   iconPath: v.optional(v.string()),
   description: v.optional(v.string()),
+  /** Innate-only; per-row tooltip merges with `effects[].constants` in the client */
+  innateConstants: v.optional(v.record(v.string(), v.number())),
   effects: v.optional(v.array(v.any())),
   unique: v.optional(v.boolean()),
   isRegion: v.optional(v.boolean()),

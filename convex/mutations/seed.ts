@@ -47,12 +47,29 @@ interface RawTrait {
   set: string
   icon_path: string
   tooltip_text?: string
+  innate_trait_sets?: Array<{
+    constants?: Array<{ name: string; value: number }>
+  }>
   conditional_trait_sets?: Array<{
+    constants?: Array<{ name: string; value: number }>
     min_units?: number
     max_units?: number
     style_idx?: number
     style_name?: string
   }>
+}
+
+/** Innate-only (used as base for merge). */
+function flattenInnateConstants(t: RawTrait): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const set of t.innate_trait_sets ?? []) {
+    for (const c of set.constants ?? []) {
+      if (c?.name != null && typeof c.value === 'number') {
+        map[c.name] = c.value
+      }
+    }
+  }
+  return map
 }
 
 interface RawItem {
@@ -62,10 +79,23 @@ interface RawItem {
   squareIconPath: string
 }
 
+type UpsertStats = {
+  championsInserted: number
+  championsUpdated: number
+  traitsInserted: number
+  traitsUpdated: number
+  itemsInserted: number
+  itemsUpdated: number
+}
+
 // Action that fetches data from Community Dragon API and seeds the database
 export const seedFromApi = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{
+    champions: number
+    traits: number
+    items: number
+  } & UpsertStats> => {
     const [championsJson, traitsJson, itemsJson] = await Promise.all([
       fetch(`${BASE}/tftchampions-teamplanner.json`).then((r) => r.json()),
       fetch(`${BASE}/tfttraits.json`).then((r) => r.json()),
@@ -109,11 +139,13 @@ export const seedFromApi = action({
         unique: false,
         isRegion: REGION_TRAIT_DISPLAY_NAMES.includes(t.display_name),
         description: t.tooltip_text,
+        innateConstants: flattenInnateConstants(t),
         effects: t?.conditional_trait_sets?.map((e) => ({
           min_units: e.min_units,
           max_units: e.max_units,
           style_idx: e.style_idx,
           style_name: e.style_name,
+          constants: e?.constants,
         })),
       }))
 
@@ -128,18 +160,26 @@ export const seedFromApi = action({
         iconPath: i.squareIconPath,
       }))
 
-    await ctx.runMutation(internal.mutations.seed.insertAll, {
-      champions,
-      traits,
-      items,
-      setKey: SET_TRAITS_FILTER,
-    })
+    const stats: UpsertStats = await ctx.runMutation(
+      internal.mutations.seed.insertAll,
+      {
+        champions,
+        traits,
+        items,
+        setKey: SET_TRAITS_FILTER,
+      },
+    )
 
-    return { champions: champions.length, traits: traits.length, items: items.length }
+    return {
+      champions: champions.length,
+      traits: traits.length,
+      items: items.length,
+      ...stats,
+    }
   },
 })
 
-/** Inserts one set’s snapshot; does not remove other sets (same tables, different `setKey`). */
+/** Upserts one set’s snapshot by `(setKey, key)` — insert if missing, else replace. Other sets untouched. */
 export const insertAll = internalMutation({
   args: {
     champions: v.array(champion),
@@ -147,10 +187,78 @@ export const insertAll = internalMutation({
     items: v.array(item),
     setKey: v.string(),
   },
+  returns: v.object({
+    championsInserted: v.number(),
+    championsUpdated: v.number(),
+    traitsInserted: v.number(),
+    traitsUpdated: v.number(),
+    itemsInserted: v.number(),
+    itemsUpdated: v.number(),
+  }),
   handler: async ({ db }, { champions, traits, items, setKey }) => {
-    for (const c of champions) await db.insert('champions', { ...c, setKey })
-    for (const t of traits) await db.insert('traits', { ...t, setKey })
-    for (const i of items) await db.insert('items', { ...i, setKey })
+    let championsInserted = 0
+    let championsUpdated = 0
+    let traitsInserted = 0
+    let traitsUpdated = 0
+    let itemsInserted = 0
+    let itemsUpdated = 0
+
+    for (const c of champions) {
+      if (!c.key) continue
+      const payload = { ...c, setKey }
+      const existing = await db
+        .query('champions')
+        .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', c.key))
+        .unique()
+      if (existing) {
+        await db.replace(existing._id, payload)
+        championsUpdated++
+      } else {
+        await db.insert('champions', payload)
+        championsInserted++
+      }
+    }
+
+    for (const t of traits) {
+      if (!t.key) continue
+      const payload = { ...t, setKey }
+      const existing = await db
+        .query('traits')
+        .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', t.key))
+        .unique()
+      if (existing) {
+        await db.replace(existing._id, payload)
+        traitsUpdated++
+      } else {
+        await db.insert('traits', payload)
+        traitsInserted++
+      }
+    }
+
+    for (const i of items) {
+      if (!i.key) continue
+      const payload = { ...i, setKey }
+      const existing = await db
+        .query('items')
+        .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', i.key))
+        .unique()
+      if (existing) {
+        await db.replace(existing._id, payload)
+        itemsUpdated++
+      } else {
+        await db.insert('items', payload)
+        itemsInserted++
+      }
+    }
+
+    return {
+      championsInserted,
+      championsUpdated,
+      traitsInserted,
+      traitsUpdated,
+      itemsInserted,
+      itemsUpdated,
+    }
   },
 })
 

@@ -3,10 +3,49 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
+import { buildTraitTooltipRows } from "../traitTooltip";
 
 export const Route = createFileRoute('/')({
     component: HomeComponent,
 })
+
+/** Tooltip for optimizer result traits: parsed <row> tooltips, milestones reached vs future. */
+function TraitResultTooltip({ t }: { t: any }) {
+    const rows = buildTraitTooltipRows(
+        t.description,
+        t.effects,
+        t.count,
+        t.innateConstants,
+    );
+    return (
+        <div
+            className="pointer-events-none absolute bottom-full left-1/2 z-[200] mb-2 hidden w-[min(22rem,calc(100vw-2rem))] max-h-[min(50vh,22rem)] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-xl border border-amber-500/30 bg-[#07070c]/98 p-3 text-left text-[11px] leading-snug text-gray-200 shadow-2xl ring-1 ring-white/10 backdrop-blur-md group-hover/trtip:block"
+            role="tooltip"
+        >
+            <div className="mb-2 border-b border-white/10 pb-2 font-bold text-amber-300">
+                {t.name}{" "}
+                <span className="font-mono text-[10px] font-normal text-gray-500">({t.count})</span>
+            </div>
+            {rows.length === 0 ? (
+                <p className="text-gray-500">Chưa có mô tả trait (seed lại hoặc chạy optimize sau khi cập nhật DB).</p>
+            ) : (
+                <ul className="space-y-2">
+                    {rows.map((r, i) => (
+                        <li
+                            key={i}
+                            className={
+                                r.active
+                                    ? "text-gray-50 font-medium [text-shadow:0_0_14px_rgba(251,191,36,0.2)]"
+                                    : "text-gray-500 text-[10px] leading-relaxed"
+                            }
+                            dangerouslySetInnerHTML={{ __html: r.html }}
+                        />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
 
 function HomeComponent() {
     const items = useQuery(api.queries.getItems, { setKey: ACTIVE_SET_KEY }) || [];
@@ -35,6 +74,8 @@ function HomeComponent() {
         | null
     >(null);
 
+    const [traitTooltipHover, setTraitTooltipHover] = useState<{ traitKey: string; boardIdx: number } | null>(null);
+
     const traitIdsForChampion = (champ: any): string[] =>
         (champ.traits ?? []).map((t: { id: string }) => t.id);
 
@@ -42,7 +83,7 @@ function HomeComponent() {
     const emblems = items.filter(i => {
         if (!i.name?.toLowerCase().includes("emblem")) return false;
         if (!isWorldRunes) return true;
-        
+
         // World Runes mode: only show region emblems
         const traitName = i.name.replace(" Emblem", "");
         const trait = traits.find(t => t.name === traitName);
@@ -449,126 +490,154 @@ function HomeComponent() {
                         };
 
                         return (
-                        <div
-                            key={idx}
-                            className="bg-[#16161f] rounded-3xl border border-white/5 overflow-hidden shadow-2xl hover:border-amber-500/30 transition-all group"
-                            onMouseLeave={() => setBoardHover((prev) => (prev?.boardIdx === idx ? null : prev))}
-                        >
-                            <div className="p-6">
-                                <div className="flex justify-between items-center mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-gray-500 font-mono text-sm uppercase tracking-widest">Board #{idx + 1}</span>
-                                        <span className="h-4 w-[1px] bg-white/10"></span>
-                                        <span className="text-amber-400 font-bold tracking-tight">POWER: {Math.round(team.score)}</span>
+                            <div
+                                key={idx}
+                                className="bg-[#16161f] rounded-3xl border border-white/5 overflow-visible shadow-2xl hover:border-amber-500/30 transition-all group"
+                                onMouseLeave={() => setBoardHover((prev) => (prev?.boardIdx === idx ? null : prev))}
+                            >
+                                <div className="p-6">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-gray-500 font-mono text-sm uppercase tracking-widest">Board #{idx + 1}</span>
+                                            <span className="h-4 w-[1px] bg-white/10"></span>
+                                            <span className="text-amber-400 font-bold tracking-tight">POWER: {Math.round(team.score)}</span>
+                                        </div>
+                                        <div className="flex -space-x-2">
+                                            {team.activeTraits.map((t: any) => {
+                                                const hi = traitHighlighted(t.key);
+                                                const dim = traitDimmed(t.key);
+                                                return (
+                                                    <span key={t.key} className="group/trtip relative z-20 inline-flex shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onMouseEnter={() => {
+                                                                setBoardHover({ boardIdx: idx, kind: "trait", traitKey: t.key })
+                                                                setTraitTooltipHover({ traitKey: t.key, boardIdx: idx })
+                                                            }}
+                                                            onMouseLeave={() => {
+                                                                setTraitTooltipHover(null)
+                                                                setBoardHover(null)
+                                                            }}
+                                                            className={`w-8 h-8 rounded-full bg-gray-900 border flex items-center justify-center overflow-hidden transition-all duration-150 ${hi ? "border-amber-400 ring-2 ring-amber-400/80 scale-110 z-10" : "border-white/10"
+                                                                } ${dim ? "opacity-35" : "opacity-100"}`}
+                                                            title={`${t.name} (${t.count})`}
+                                                        >
+                                                            <img src={getImageUrl(t.iconPath)} className="w-5 h-5 object-contain" alt="" />
+                                                        </button>
+                                                        {
+                                                            traitTooltipHover?.traitKey === t.key && traitTooltipHover?.boardIdx === idx && (
+                                                                <TraitResultTooltip t={t} />
+                                                            )
+                                                        }
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                    <div className="flex -space-x-2">
-                                        {team.activeTraits.slice(0, 10).map((t: any) => {
+
+                                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-3">
+                                        {team.champions.map((champ: any) => {
+                                            const borderClass =
+                                                champ.cost === 5
+                                                    ? "border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
+                                                    : champ.cost === 4
+                                                        ? "border-purple-500"
+                                                        : champ.cost === 3
+                                                            ? "border-blue-500"
+                                                            : champ.cost === 2
+                                                                ? "border-green-500"
+                                                                : "border-gray-500";
+                                            const ch = champHighlighted(champ);
+                                            const dim = champDimmed(champ);
+                                            return (
+                                                <div key={champ.key} className="flex flex-col items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onMouseEnter={() => {
+                                                            setBoardHover({ boardIdx: idx, kind: "champion", champKey: champ.key })
+                                                        }}
+                                                        className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 text-left transition-all duration-150 ${borderClass} ${ch ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-[#16161f] scale-[1.03] z-10" : ""
+                                                            } ${dim ? "opacity-40" : "opacity-100"}`}
+                                                    >
+                                                        <img
+                                                            src={getImageUrl(champ.iconPath)}
+                                                            alt={champ.name}
+                                                            className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all"
+                                                        />
+                                                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm text-[8px] sm:text-[10px] text-center font-bold py-0.5 uppercase truncate px-1 pointer-events-none">
+                                                            {champ.name}
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="mt-6 flex flex-wrap gap-2">
+                                        {team.activeTraits.map((t: any) => {
+                                            const isMax = t.tier === t.totalTiers;
+                                            const isUnique = t.unique;
+                                            const isRegion = t.isRegion;
                                             const hi = traitHighlighted(t.key);
                                             const dim = traitDimmed(t.key);
+
                                             return (
-                                            <button
-                                                type="button"
-                                                key={t.key}
-                                                onMouseEnter={() => setBoardHover({ boardIdx: idx, kind: "trait", traitKey: t.key })}
-                                                className={`w-8 h-8 rounded-full bg-gray-900 border flex items-center justify-center overflow-hidden transition-all duration-150 ${
-                                                    hi ? "border-amber-400 ring-2 ring-amber-400/80 scale-110 z-10" : "border-white/10"
-                                                } ${dim ? "opacity-35" : "opacity-100"}`}
-                                                title={`${t.name} (${t.count})`}
-                                            >
-                                                <img src={getImageUrl(t.iconPath)} className="w-5 h-5 object-contain" alt="" />
-                                            </button>
-                                        );})}
+                                                <span key={t.key} className="group/trtip relative z-20 inline-flex">
+                                                    <button
+                                                        type="button"
+                                                        onMouseEnter={() => {
+                                                            setBoardHover({ boardIdx: idx, kind: "trait", traitKey: t.key })
+                                                            setTraitTooltipHover({ traitKey: t.key, boardIdx: idx })
+                                                        }}
+                                                        onMouseLeave={() => {
+                                                            setTraitTooltipHover(null)
+                                                            setBoardHover(null)
+                                                        }}
+                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 border text-left ${isRegion
+                                                            ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                                                            : isMax || isUnique
+                                                                ? "bg-amber-500 border-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.2)]"
+                                                                : t.tier >= 2
+                                                                    ? "bg-gray-800 border-amber-500/50 text-amber-400"
+                                                                    : "bg-gray-800 border-white/5 text-gray-400"
+                                                            } ${hi ? "ring-2 ring-amber-300 scale-[1.02] shadow-lg z-10" : ""} ${dim ? "opacity-40" : ""}`}
+                                                    >
+                                                        <div className="relative">
+                                                            <img src={getImageUrl(t.iconPath)} className={`w-4 h-4 object-contain ${isMax || isUnique ? "brightness-0" : "brightness-110"}`} alt="" />
+                                                        </div>
+                                                        <div className="flex flex-col leading-none">
+                                                            <div className="flex items-center gap-1">
+                                                                <span>{t.name}</span>
+                                                                {isRegion && <span className="text-[8px] bg-blue-500 text-white px-1 rounded">REGION</span>}
+                                                            </div>
+                                                            {!isUnique && (
+                                                                <div className="flex gap-0.5 mt-0.5">
+                                                                    {t.allMilestones.map((m: number, mi: number) => (
+                                                                        <div
+                                                                            key={mi}
+                                                                            className={`w-1 h-1 rounded-full ${t.count >= m ? (isMax || isUnique ? "bg-black" : "bg-amber-400") : "bg-white/10"}`}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <span className={`ml-1 text-[10px] ${isMax || isUnique ? "opacity-70" : "text-gray-500"}`}>
+                                                            {t.count}
+                                                        </span>
+                                                    </button>
+                                                    {
+                                                        traitTooltipHover?.traitKey === t.key && traitTooltipHover?.boardIdx === idx && (
+                                                            <TraitResultTooltip t={t} />
+                                                        )
+                                                    }
+                                                </span>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-
-                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 gap-3">
-                                    {team.champions.map((champ: any) => {
-                                        const borderClass =
-                                            champ.cost === 5
-                                                ? "border-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
-                                                : champ.cost === 4
-                                                  ? "border-purple-500"
-                                                  : champ.cost === 3
-                                                    ? "border-blue-500"
-                                                    : champ.cost === 2
-                                                      ? "border-green-500"
-                                                      : "border-gray-500";
-                                        const ch = champHighlighted(champ);
-                                        const dim = champDimmed(champ);
-                                        return (
-                                        <div key={champ.key} className="flex flex-col items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onMouseEnter={() => setBoardHover({ boardIdx: idx, kind: "champion", champKey: champ.key })}
-                                                className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 text-left transition-all duration-150 ${borderClass} ${
-                                                    ch ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-[#16161f] scale-[1.03] z-10" : ""
-                                                } ${dim ? "opacity-40" : "opacity-100"}`}
-                                            >
-                                                <img
-                                                    src={getImageUrl(champ.iconPath)}
-                                                    alt={champ.name}
-                                                    className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all"
-                                                />
-                                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm text-[8px] sm:text-[10px] text-center font-bold py-0.5 uppercase truncate px-1 pointer-events-none">
-                                                    {champ.name}
-                                                </div>
-                                            </button>
-                                        </div>
-                                    );})}
-                                </div>
-
-                                <div className="mt-6 flex flex-wrap gap-2">
-                                    {team.activeTraits.map((t: any) => {
-                                        const isMax = t.tier === t.totalTiers;
-                                        const isUnique = t.unique;
-                                        const isRegion = t.isRegion;
-                                        const hi = traitHighlighted(t.key);
-                                        const dim = traitDimmed(t.key);
-
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={t.key}
-                                                onMouseEnter={() => setBoardHover({ boardIdx: idx, kind: "trait", traitKey: t.key })}
-                                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 border text-left ${
-                                                    isRegion
-                                                        ? "bg-blue-600/20 border-blue-500 text-blue-400"
-                                                        : isMax || isUnique
-                                                          ? "bg-amber-500 border-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.2)]"
-                                                          : t.tier >= 2
-                                                            ? "bg-gray-800 border-amber-500/50 text-amber-400"
-                                                            : "bg-gray-800 border-white/5 text-gray-400"
-                                                } ${hi ? "ring-2 ring-amber-300 scale-[1.02] shadow-lg z-10" : ""} ${dim ? "opacity-40" : ""}`}
-                                            >
-                                                <div className="relative">
-                                                    <img src={getImageUrl(t.iconPath)} className={`w-4 h-4 object-contain ${isMax || isUnique ? "brightness-0" : "brightness-110"}`} alt="" />
-                                                </div>
-                                                <div className="flex flex-col leading-none">
-                                                    <div className="flex items-center gap-1">
-                                                        <span>{t.name}</span>
-                                                        {isRegion && <span className="text-[8px] bg-blue-500 text-white px-1 rounded">REGION</span>}
-                                                    </div>
-                                                    {!isUnique && (
-                                                        <div className="flex gap-0.5 mt-0.5">
-                                                            {t.allMilestones.map((m: number, mi: number) => (
-                                                                <div
-                                                                    key={mi}
-                                                                    className={`w-1 h-1 rounded-full ${t.count >= m ? (isMax || isUnique ? "bg-black" : "bg-amber-400") : "bg-white/10"}`}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <span className={`ml-1 text-[10px] ${isMax || isUnique ? "opacity-70" : "text-gray-500"}`}>
-                                                    {t.count}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
                             </div>
-                        </div>
-                    );})}
+                        );
+                    })}
                 </div>
             </main>
         </div>
