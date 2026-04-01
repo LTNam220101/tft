@@ -222,7 +222,6 @@ export function buildTraitTooltipRows(
 
   const rowRegex = /<row>([\s\S]*?)<\/row>/gi
   const matches = [...decoded.matchAll(rowRegex)]
-
   const rowInnerToHtml = (rawInner: string, effect: TraitEffectLite | undefined): string => {
     let text = cleanRowInner(rawInner)
     text = applyMinUnitsPlaceholder(text, effect)

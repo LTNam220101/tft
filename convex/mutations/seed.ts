@@ -9,7 +9,7 @@ import { champion, item, trait } from '../schema'
  */
 const CDRAGON_PATCH = 'pbe'
 
-const BASE = `https://raw.communitydragon.org/${CDRAGON_PATCH}/plugins/rcp-be-lol-game-data/global/en_au/v1`
+const BASE = `https://raw.communitydragon.org/${CDRAGON_PATCH}/plugins/rcp-be-lol-game-data/global/default/v1`
 
 /** Key in tftchampions-teamplanner.json (e.g. TFTSet17). */
 const SET_CHAMPIONS_KEY = 'TFTSet17' as const
