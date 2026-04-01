@@ -25,7 +25,7 @@ function decodeTooltipDescription(raw: string): string {
       .replace(/\r/g, '\\r')
       .replace(/\n/g, '\\n')
       .replace(/\t/g, '\\t')
-      .replace('&nbsp;', ' ')
+      .replace(/&nbsp;/g, ' ')
     return JSON.parse(`"${escaped}"`) as string
   } catch {
     return raw
