@@ -12,6 +12,7 @@ import type * as gameConfig from "../gameConfig.js";
 import type * as mutations_champions from "../mutations/champions.js";
 import type * as mutations_seed from "../mutations/seed.js";
 import type * as optimizer from "../optimizer.js";
+import type * as optimizerMissFortune from "../optimizerMissFortune.js";
 import type * as optimizerSetBonuses from "../optimizerSetBonuses.js";
 import type * as queries from "../queries.js";
 
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   "mutations/champions": typeof mutations_champions;
   "mutations/seed": typeof mutations_seed;
   optimizer: typeof optimizer;
+  optimizerMissFortune: typeof optimizerMissFortune;
   optimizerSetBonuses: typeof optimizerSetBonuses;
   queries: typeof queries;
 }>;

@@ -3,6 +3,46 @@
  * Add a branch in `setSpecificTeamScoreDelta` when a new TFT set needs custom rules.
  */
 
+/** Generic trait synergy score (same rules as `calculateTeamScoreFromCounts` main loop). */
+export function scoreCoreTraitContribution(
+    rawTraitCounts: Record<string, number>,
+    traitMap: Map<string, any>,
+    mode: "wide" | "deep",
+    emblemCounts: Record<string, number>,
+): number {
+    let totalScore = 0;
+    for (const [traitId, count] of Object.entries(rawTraitCounts)) {
+        const traitDef = traitMap.get(traitId);
+        if (!traitDef || !traitDef.effects) continue;
+
+        const activeEffects = traitDef.effects.filter((eff: any) => count >= eff.min_units);
+
+        if (activeEffects.length > 0) {
+            if (mode === "wide") {
+                if (traitDef.unique) {
+                    totalScore += 1;
+                } else {
+                    totalScore += 5;
+                }
+            } else {
+                if (traitDef.unique) {
+                    totalScore += 1;
+                } else {
+                    const currentMinUnits = activeEffects[activeEffects.length - 1].min_units;
+                    if (emblemCounts[traitId]) {
+                        totalScore += currentMinUnits * currentMinUnits * currentMinUnits;
+                    } else {
+                        totalScore += currentMinUnits * currentMinUnits;
+                    }
+                }
+            }
+        } else if (emblemCounts[traitId]) {
+            totalScore -= 100;
+        }
+    }
+    return totalScore;
+}
+
 export function setSpecificTeamScoreDelta(
     setKey: string,
     rawTraitCounts: Record<string, number>,
