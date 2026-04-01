@@ -8,9 +8,11 @@
  * @module
  */
 
+import type * as gameConfig from "../gameConfig.js";
 import type * as mutations_champions from "../mutations/champions.js";
 import type * as mutations_seed from "../mutations/seed.js";
 import type * as optimizer from "../optimizer.js";
+import type * as optimizerSetBonuses from "../optimizerSetBonuses.js";
 import type * as queries from "../queries.js";
 
 import type {
@@ -20,9 +22,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  gameConfig: typeof gameConfig;
   "mutations/champions": typeof mutations_champions;
   "mutations/seed": typeof mutations_seed;
   optimizer: typeof optimizer;
+  optimizerSetBonuses: typeof optimizerSetBonuses;
   queries: typeof queries;
 }>;
 

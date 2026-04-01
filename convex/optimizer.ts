@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import { ACTIVE_SET_KEY } from "./gameConfig";
+import { setSpecificTeamScoreDelta } from "./optimizerSetBonuses";
+
+/** Minimum distinct active region traits for `suggestWorldRunes` (tune per set if the mode rules change). */
+const WORLD_RUNE_MIN_ACTIVE_REGIONS = 4;
 
 export const suggestTeams = action({
     args: {
@@ -11,9 +16,13 @@ export const suggestTeams = action({
         blockedChampIds: v.optional(v.array(v.string())), // IDs of champions to exclude
     },
     handler: async (ctx, { emblemIds, teamSize, mode = "deep", mustHaveChampIds = [], blockedChampIds = [] }) => {
-        const allChampions: any[] = await ctx.runQuery(internal.queries.getChampions);
-        const traits: any[] = await ctx.runQuery(api.queries.getTraits);
-        const items: any[] = await ctx.runQuery(internal.queries.getItemsInternal);
+        const allChampions: any[] = await ctx.runQuery(internal.queries.getChampions, {
+            setKey: ACTIVE_SET_KEY,
+        });
+        const traits: any[] = await ctx.runQuery(api.queries.getTraits, { setKey: ACTIVE_SET_KEY });
+        const items: any[] = await ctx.runQuery(internal.queries.getItemsInternal, {
+            setKey: ACTIVE_SET_KEY,
+        });
 
         const traitMap = new Map(traits.map(t => [t.key || t._id, t]));
 
@@ -45,7 +54,15 @@ export const suggestTeams = action({
             score: 0,
             key: lockedInChamps.map((c: any) => c.key!).sort().join(",")
         }];
-        beam[0].score = calculateTeamScoreFromCounts(beam[0].nativeCounts, lockedInChamps.length, emblemCounts, traitMap, mode, beam[0].champions);
+        beam[0].score = calculateTeamScoreFromCounts(
+            beam[0].nativeCounts,
+            lockedInChamps.length,
+            emblemCounts,
+            traitMap,
+            mode,
+            beam[0].champions,
+            ACTIVE_SET_KEY,
+        );
 
         const beamWidth = 60;
 
@@ -82,7 +99,15 @@ export const suggestTeams = action({
                     if (seenKeys.has(teamKey)) continue;
                     seenKeys.add(teamKey);
 
-                    const score = calculateTeamScoreFromCounts(newNativeCounts, newTeam.length, emblemCounts, traitMap, mode, newTeam);
+                    const score = calculateTeamScoreFromCounts(
+                        newNativeCounts,
+                        newTeam.length,
+                        emblemCounts,
+                        traitMap,
+                        mode,
+                        newTeam,
+                        ACTIVE_SET_KEY,
+                    );
 
                     nextCandidates.push({
                         champions: newTeam,
@@ -118,9 +143,13 @@ export const suggestWorldRunes = action({
         blockedChampIds: v.optional(v.array(v.string())),
     },
     handler: async (ctx, { emblemIds, mustHaveChampIds = [], blockedChampIds = [] }) => {
-        const allChampions: any[] = await ctx.runQuery(internal.queries.getChampions);
-        const traits: any[] = await ctx.runQuery(api.queries.getTraits);
-        const items: any[] = await ctx.runQuery(internal.queries.getItemsInternal);
+        const allChampions: any[] = await ctx.runQuery(internal.queries.getChampions, {
+            setKey: ACTIVE_SET_KEY,
+        });
+        const traits: any[] = await ctx.runQuery(api.queries.getTraits, { setKey: ACTIVE_SET_KEY });
+        const items: any[] = await ctx.runQuery(internal.queries.getItemsInternal, {
+            setKey: ACTIVE_SET_KEY,
+        });
 
         const traitMap = new Map(traits.map(t => [t.key || t._id, t]));
         const champions = allChampions.filter((c: any) => c.isLocked !== true && !blockedChampIds.includes(c._id));
@@ -205,7 +234,15 @@ export const suggestWorldRunes = action({
                     .slice(0, beamWidth);
             }
 
-            const validResults = beam.filter((state: any) => countActiveRegionsFromCounts(state.nativeCounts, state.champions.length, emblemCounts, traitMap) >= 4);
+            const validResults = beam.filter(
+                (state: any) =>
+                    countActiveRegionsFromCounts(
+                        state.nativeCounts,
+                        state.champions.length,
+                        emblemCounts,
+                        traitMap,
+                    ) >= WORLD_RUNE_MIN_ACTIVE_REGIONS,
+            );
 
             if (validResults.length > 0) {
                 return validResults
@@ -247,7 +284,8 @@ function calculateTeamScoreFromCounts(
     emblemCounts: Record<string, number>,
     traitMap: Map<string, any>,
     mode: "wide" | "deep",
-    team: any[]
+    team: any[],
+    setKey: string,
 ) {
     let totalScore = 0;
     const rawTraitCounts: Record<string, number> = { ...nativeCounts };
@@ -291,27 +329,7 @@ function calculateTeamScoreFromCounts(
         }
     }
 
-    // Synergy Rules (Synergy rules are usually small, so we keep them simple)
-    const teamKeys = new Set(team.map(c => c.key));
-    if (teamKeys.has("TFT16_Ryze")) {
-        let regionCount = 0;
-        for (const [traitId, count] of Object.entries(rawTraitCounts)) {
-            const traitDef = traitMap.get(traitId);
-            if (traitDef?.isRegion) {
-                const active = traitDef.effects?.some((eff: any) => count >= eff.min_units);
-                if (active) {
-                    regionCount++;
-                }
-            }
-        }
-        totalScore += (regionCount < 4) ? -100 * (4 - regionCount) : 100 * regionCount;
-    }
-
-    if (teamKeys.has("TFT16_Tibber") && !teamKeys.has("TFT16_Annie")) totalScore -= 100;
-    else if (teamKeys.has("TFT16_Tibber") && teamKeys.has("TFT16_Annie")) totalScore += 50;
-
-    if (teamKeys.has("TFT16_Yone") && !teamKeys.has("TFT16_Yasuo")) totalScore -= 100;
-    else if (teamKeys.has("TFT16_Yone") && teamKeys.has("TFT16_Yasuo")) totalScore += 100;
+    totalScore += setSpecificTeamScoreDelta(setKey, rawTraitCounts, traitMap, team);
 
     // Cost Penalty
     for (const c of team) {

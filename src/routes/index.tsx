@@ -2,15 +2,16 @@ import { useState } from "react";
 import { createFileRoute } from '@tanstack/react-router'
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
 
 export const Route = createFileRoute('/')({
     component: HomeComponent,
 })
 
 function HomeComponent() {
-    const items = useQuery(api.queries.getItems) || [];
-    const allChampions = useQuery(api.queries.listChampions) || [];
-    const traits = useQuery(api.queries.getTraits) || [];
+    const items = useQuery(api.queries.getItems, { setKey: ACTIVE_SET_KEY }) || [];
+    const allChampions = useQuery(api.queries.listChampions, { setKey: ACTIVE_SET_KEY }) || [];
+    const traits = useQuery(api.queries.getTraits, { setKey: ACTIVE_SET_KEY }) || [];
 
     const [isWorldRunes, setIsWorldRunes] = useState(false);
     const [selectedEmblemKeys, setSelectedEmblemKeys] = useState<string[]>([]);
@@ -106,7 +107,7 @@ function HomeComponent() {
         if (path.startsWith("http")) return path;
         // Community Dragon path resolution
         const cleanPath = path.toLowerCase().replace("/lol-game-data/assets/", "");
-        return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/${cleanPath}`;
+        return `${(import.meta as any).env.VITE_CDRAGON_PATCH}/${cleanPath}`;
     };
 
     const filteredSelectionChamps = selectionFilter
@@ -121,7 +122,7 @@ function HomeComponent() {
         <div className="min-h-screen bg-[#0a0a0f] text-gray-100 font-sans p-4 md:p-8">
             <header className="max-w-6xl mx-auto mb-12 text-center">
                 <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-700 bg-clip-text text-transparent mb-4 tracking-tight">
-                    TFT SET 16 OPTIMIZER
+                    TFT SET 17 OPTIMIZER
                 </h1>
                 <p className="text-gray-400 text-lg max-w-2xl mx-auto">
                     Select your emblems and discover the most powerful board combinations.
