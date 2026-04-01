@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute } from '@tanstack/react-router'
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -9,18 +10,36 @@ export const Route = createFileRoute('/')({
     component: HomeComponent,
 })
 
-/** Tooltip for optimizer result traits: parsed <row> tooltips, milestones reached vs future. */
-function TraitResultTooltip({ t }: { t: any }) {
+type TraitTooltipPlacement = "iconRow" | "pillRow";
+
+/** Renders in `document.body` with fixed coords — always on top of board stacking contexts. */
+function TraitResultTooltipPortal({
+    t,
+    anchorRect,
+}: {
+    t: any;
+    anchorRect: DOMRect;
+}) {
     const rows = buildTraitTooltipRows(
         t.description,
         t.effects,
         t.count,
         t.innateConstants,
     );
-    return (
+
+    const style: CSSProperties = {
+        position: "fixed",
+        left: anchorRect.left + anchorRect.width / 2,
+        top: anchorRect.bottom + 8,
+        transform: "translateX(-50%)",
+        zIndex: 2147483647,
+    };
+
+    const panel = (
         <div
-            className="pointer-events-none absolute bottom-full left-1/2 z-[200] mb-2 hidden w-[min(22rem,calc(100vw-2rem))] max-h-[min(50vh,22rem)] -translate-x-1/2 overflow-y-auto overscroll-contain rounded-xl border border-amber-500/30 bg-[#07070c]/98 p-3 text-left text-[11px] leading-snug text-gray-200 shadow-2xl ring-1 ring-white/10 backdrop-blur-md group-hover/trtip:block"
+            className="pointer-events-none w-[min(22rem,calc(100vw-2rem))] max-h-[min(50vh,22rem)] overflow-y-auto overscroll-contain rounded-xl border border-amber-500/30 bg-[#07070c]/98 p-3 text-left text-[11px] leading-snug text-gray-200 shadow-2xl ring-1 ring-white/10 backdrop-blur-md"
             role="tooltip"
+            style={style}
         >
             <div className="mb-2 border-b border-white/10 pb-2 font-bold text-amber-300">
                 {t.name}{" "}
@@ -45,6 +64,9 @@ function TraitResultTooltip({ t }: { t: any }) {
             )}
         </div>
     );
+
+    if (typeof document === "undefined") return null;
+    return createPortal(panel, document.body);
 }
 
 function HomeComponent() {
@@ -74,7 +96,23 @@ function HomeComponent() {
         | null
     >(null);
 
-    const [traitTooltipHover, setTraitTooltipHover] = useState<{ traitKey: string; boardIdx: number } | null>(null);
+    const [traitTooltipHover, setTraitTooltipHover] = useState<{
+        traitKey: string;
+        boardIdx: number;
+        anchorRect: DOMRect;
+        placement: TraitTooltipPlacement;
+    } | null>(null);
+
+    useEffect(() => {
+        if (!traitTooltipHover) return;
+        const clear = () => setTraitTooltipHover(null);
+        window.addEventListener("scroll", clear, true);
+        window.addEventListener("resize", clear);
+        return () => {
+            window.removeEventListener("scroll", clear, true);
+            window.removeEventListener("resize", clear);
+        };
+    }, [traitTooltipHover]);
 
     const traitIdsForChampion = (champ: any): string[] =>
         (champ.traits ?? []).map((t: { id: string }) => t.id);
@@ -493,7 +531,10 @@ function HomeComponent() {
                             <div
                                 key={idx}
                                 className="bg-[#16161f] rounded-3xl border border-white/5 overflow-visible shadow-2xl hover:border-amber-500/30 transition-all group"
-                                onMouseLeave={() => setBoardHover((prev) => (prev?.boardIdx === idx ? null : prev))}
+                                onMouseLeave={() => {
+                                    setBoardHover((prev) => (prev?.boardIdx === idx ? null : prev));
+                                    setTraitTooltipHover((prev) => (prev?.boardIdx === idx ? null : prev));
+                                }}
                             >
                                 <div className="p-6">
                                     <div className="flex justify-between items-center mb-6">
@@ -507,28 +548,28 @@ function HomeComponent() {
                                                 const hi = traitHighlighted(t.key);
                                                 const dim = traitDimmed(t.key);
                                                 return (
-                                                    <span key={t.key} className="group/trtip relative z-20 inline-flex shrink-0">
+                                                    <span key={t.key} className="relative z-1 inline-flex shrink-0">
                                                         <button
                                                             type="button"
-                                                            onMouseEnter={() => {
+                                                            onMouseEnter={(e) => {
                                                                 setBoardHover({ boardIdx: idx, kind: "trait", traitKey: t.key })
-                                                                setTraitTooltipHover({ traitKey: t.key, boardIdx: idx })
+                                                                setTraitTooltipHover({
+                                                                    traitKey: t.key,
+                                                                    boardIdx: idx,
+                                                                    placement: "iconRow",
+                                                                    anchorRect: e.currentTarget.getBoundingClientRect(),
+                                                                })
                                                             }}
                                                             onMouseLeave={() => {
                                                                 setTraitTooltipHover(null)
                                                                 setBoardHover(null)
                                                             }}
-                                                            className={`w-8 h-8 rounded-full bg-gray-900 border flex items-center justify-center overflow-hidden transition-all duration-150 ${hi ? "border-amber-400 ring-2 ring-amber-400/80 scale-110 z-10" : "border-white/10"
+                                                            className={`w-8 h-8 rounded-full bg-gray-900 border flex items-center justify-center overflow-hidden transition-all duration-150 ${hi ? "border-amber-400 ring-2 ring-amber-400/80 scale-110" : "border-white/10"
                                                                 } ${dim ? "opacity-35" : "opacity-100"}`}
                                                             title={`${t.name} (${t.count})`}
                                                         >
                                                             <img src={getImageUrl(t.iconPath)} className="w-5 h-5 object-contain" alt="" />
                                                         </button>
-                                                        {
-                                                            traitTooltipHover?.traitKey === t.key && traitTooltipHover?.boardIdx === idx && (
-                                                                <TraitResultTooltip t={t} />
-                                                            )
-                                                        }
                                                     </span>
                                                 );
                                             })}
@@ -556,7 +597,7 @@ function HomeComponent() {
                                                         onMouseEnter={() => {
                                                             setBoardHover({ boardIdx: idx, kind: "champion", champKey: champ.key })
                                                         }}
-                                                        className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 text-left transition-all duration-150 ${borderClass} ${ch ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-[#16161f] scale-[1.03] z-10" : ""
+                                                        className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 text-left transition-all duration-150 ${borderClass} ${ch ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-[#16161f] scale-[1.03]" : ""
                                                             } ${dim ? "opacity-40" : "opacity-100"}`}
                                                     >
                                                         <img
@@ -582,12 +623,17 @@ function HomeComponent() {
                                             const dim = traitDimmed(t.key);
 
                                             return (
-                                                <span key={t.key} className="group/trtip relative z-20 inline-flex">
+                                                <span key={t.key} className="relative z-1 inline-flex">
                                                     <button
                                                         type="button"
-                                                        onMouseEnter={() => {
+                                                        onMouseEnter={(e) => {
                                                             setBoardHover({ boardIdx: idx, kind: "trait", traitKey: t.key })
-                                                            setTraitTooltipHover({ traitKey: t.key, boardIdx: idx })
+                                                            setTraitTooltipHover({
+                                                                traitKey: t.key,
+                                                                boardIdx: idx,
+                                                                placement: "pillRow",
+                                                                anchorRect: e.currentTarget.getBoundingClientRect(),
+                                                            })
                                                         }}
                                                         onMouseLeave={() => {
                                                             setTraitTooltipHover(null)
@@ -600,7 +646,7 @@ function HomeComponent() {
                                                                 : t.tier >= 2
                                                                     ? "bg-gray-800 border-amber-500/50 text-amber-400"
                                                                     : "bg-gray-800 border-white/5 text-gray-400"
-                                                            } ${hi ? "ring-2 ring-amber-300 scale-[1.02] shadow-lg z-10" : ""} ${dim ? "opacity-40" : ""}`}
+                                                            } ${hi ? "ring-2 ring-amber-300 scale-[1.02] shadow-lg" : ""} ${dim ? "opacity-40" : ""}`}
                                                     >
                                                         <div className="relative">
                                                             <img src={getImageUrl(t.iconPath)} className={`w-4 h-4 object-contain ${isMax || isUnique ? "brightness-0" : "brightness-110"}`} alt="" />
@@ -625,11 +671,6 @@ function HomeComponent() {
                                                             {t.count}
                                                         </span>
                                                     </button>
-                                                    {
-                                                        traitTooltipHover?.traitKey === t.key && traitTooltipHover?.boardIdx === idx && (
-                                                            <TraitResultTooltip t={t} />
-                                                        )
-                                                    }
                                                 </span>
                                             );
                                         })}
@@ -640,6 +681,18 @@ function HomeComponent() {
                     })}
                 </div>
             </main>
+            {traitTooltipHover && results && (() => {
+                const team = results[traitTooltipHover.boardIdx];
+                const tr = team?.activeTraits?.find((x: any) => x.key === traitTooltipHover.traitKey);
+                if (!team || !tr) return null;
+                return (
+                    <TraitResultTooltipPortal
+                        key={`tt-${traitTooltipHover.boardIdx}-${traitTooltipHover.traitKey}`}
+                        t={tr}
+                        anchorRect={traitTooltipHover.anchorRect}
+                    />
+                );
+            })()}
         </div>
     );
 }
