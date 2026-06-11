@@ -9,16 +9,16 @@ import * as React from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import appCss from '~/styles/app.css?url'
 
-const PLATFORMS = [
-  { value: "vn2", label: "VN" },
-  { value: "na1", label: "NA" },
-  { value: "euw1", label: "EUW" },
-  { value: "kr", label: "KR" },
-  { value: "sg2", label: "SG" },
-  { value: "jp1", label: "JP" },
-  { value: "br1", label: "BR" },
-  { value: "eun1", label: "EUNE" },
-] as const;
+// const PLATFORMS = [
+//   { value: "vn2", label: "VN" },
+//   { value: "na1", label: "NA" },
+//   { value: "euw1", label: "EUW" },
+//   { value: "kr", label: "KR" },
+//   { value: "sg2", label: "SG" },
+//   { value: "jp1", label: "JP" },
+//   { value: "br1", label: "BR" },
+//   { value: "eun1", label: "EUNE" },
+// ] as const;
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
@@ -72,18 +72,18 @@ function RootComponent() {
 }
 
 function NavHeader() {
-  const [searchInput, setSearchInput] = React.useState("");
-  const [platform, setPlatform] = React.useState("vn2");
+  // const [searchInput, setSearchInput] = React.useState("");
+  // const [platform, setPlatform] = React.useState("vn2");
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const hashIdx = searchInput.indexOf("#");
-    if (hashIdx < 1) return;
-    const name = searchInput.slice(0, hashIdx).trim();
-    const tag = searchInput.slice(hashIdx + 1).trim();
-    if (!name || !tag) return;
-    window.location.href = `/player/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?platform=${encodeURIComponent(platform)}`;
-  };
+  // const handleSearch = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   const hashIdx = searchInput.indexOf("#");
+  //   if (hashIdx < 1) return;
+  //   const name = searchInput.slice(0, hashIdx).trim();
+  //   const tag = searchInput.slice(hashIdx + 1).trim();
+  //   if (!name || !tag) return;
+  //   window.location.href = `/player/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?platform=${encodeURIComponent(platform)}`;
+  // };
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-[#07070c]/95 backdrop-blur-sm">
