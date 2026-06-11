@@ -39,16 +39,32 @@ type ActiveTrait = {
     description?: string; innateConstants?: Record<string, number>; effects?: any[];
 };
 
+function getEmblemTraitKey(item: any, traitByName: Map<string, string>): string | null {
+    if (!item?.isEmblem || !item.name) return null;
+    return traitByName.get(item.name.replace(" Emblem", "")) ?? null;
+}
+
+function champHasTraitNatively(champKey: string, traitKey: string, champByKey: Map<string, any>): boolean {
+    return (champByKey.get(champKey)?.traits ?? []).some((t: any) => t.id === traitKey);
+}
+
 function computeTraits(
     slots: (string | null)[],
     champByKey: Map<string, any>,
     traitByKey: Map<string, any>,
+    champItems: Record<string, string[]>,
+    itemsByKey: Map<string, any>,
+    traitByName: Map<string, string>,
 ): ActiveTrait[] {
     const counts: Record<string, number> = {};
     for (const key of slots) {
         if (!key) continue;
         for (const t of champByKey.get(key)?.traits ?? []) {
             counts[t.id] = (counts[t.id] || 0) + 1;
+        }
+        for (const itemKey of champItems[key] ?? []) {
+            const traitKey = getEmblemTraitKey(itemsByKey.get(itemKey), traitByName);
+            if (traitKey) counts[traitKey] = (counts[traitKey] || 0) + 1;
         }
     }
     const result: ActiveTrait[] = [];
@@ -267,6 +283,7 @@ function BuilderComponent() {
 
     const champByKey = useMemo(() => new Map(allChampions.map(c => [c.key!, c])), [allChampions]);
     const traitByKey = useMemo(() => new Map(allTraits.map(t => [t.key!, t])), [allTraits]);
+    const traitByName = useMemo(() => new Map(allTraits.map(t => [t.name!, t.key!])), [allTraits]);
     const itemsByKey = useMemo(() => new Map(allItems.map(i => [i.key!, i])), [allItems]);
 
     // ── Board ────────────────────────────────────────────────────────────────
@@ -298,8 +315,8 @@ function BuilderComponent() {
     const boardChampKeys = useMemo(() => new Set(slots.filter(Boolean) as string[]), [slots]);
 
     const activeTraits = useMemo(
-        () => computeTraits(slots, champByKey, traitByKey),
-        [slots, champByKey, traitByKey],
+        () => computeTraits(slots, champByKey, traitByKey, champItems, itemsByKey, traitByName),
+        [slots, champByKey, traitByKey, champItems, itemsByKey, traitByName],
     );
 
     const pickerChamps = useMemo(() => {
@@ -404,8 +421,19 @@ function BuilderComponent() {
     function handleHexDragOver(e: React.DragEvent, idx: number) {
         const p = dragRef.current;
         if (!p) return;
-        // Allow champion drop always; item drop only on occupied hex
-        if (p.kind === "champion" || (p.kind === "item" && slots[idx] !== null)) {
+        if (p.kind === "champion") {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            setDragOverHex(idx);
+        } else if (p.kind === "item" && slots[idx] !== null) {
+            const destChampKey = slots[idx]!;
+            const item = itemsByKey.get(p.itemKey);
+            if (item?.isEmblem) {
+                const traitKey = getEmblemTraitKey(item, traitByName);
+                if (traitKey && champHasTraitNatively(destChampKey, traitKey, champByKey)) {
+                    return; // cursor shows no-drop; drop will be ignored
+                }
+            }
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
             setDragOverHex(idx);
@@ -444,17 +472,22 @@ function BuilderComponent() {
             const destChampKey = slots[idx];
             if (!destChampKey) { endDrag(); return; }
 
+            // Block emblem if champion already has that trait natively
+            const item = itemsByKey.get(itemKey);
+            if (item?.isEmblem) {
+                const traitKey = getEmblemTraitKey(item, traitByName);
+                if (traitKey && champHasTraitNatively(destChampKey, traitKey, champByKey)) {
+                    endDrag(); return;
+                }
+            }
+
             setChampItems(prev => {
                 const n = { ...prev };
-                // Remove from source if moving between champions
                 if (fromChampKey && fromChampKey !== destChampKey) {
                     n[fromChampKey] = (n[fromChampKey] ?? []).filter(k => k !== itemKey);
                 }
-                // Add to destination (first free slot, no duplicates from same src)
                 const current = n[destChampKey] ?? [];
                 if (current.length < 3 && !current.includes(itemKey)) {
-                    n[destChampKey] = [...current, itemKey];
-                } else if (current.length < 3) {
                     n[destChampKey] = [...current, itemKey];
                 }
                 return n;
