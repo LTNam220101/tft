@@ -15,6 +15,7 @@ import type * as optimizer from "../optimizer.js";
 import type * as optimizerMissFortune from "../optimizerMissFortune.js";
 import type * as optimizerSetBonuses from "../optimizerSetBonuses.js";
 import type * as queries from "../queries.js";
+import type * as riot from "../riot.js";
 
 import type {
   ApiFromModules,
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   optimizerMissFortune: typeof optimizerMissFortune;
   optimizerSetBonuses: typeof optimizerSetBonuses;
   queries: typeof queries;
+  riot: typeof riot;
 }>;
 
 /**

@@ -151,13 +151,17 @@ export const seedFromApi = action({
 
     const items = (itemsJson as RawItem[])
       .filter(
-        (i) => i.nameId?.startsWith(ITEM_NAMEID_PREFIX) && i.name.includes('Emblem'),
+        (i) =>
+          i.nameId?.startsWith(ITEM_NAMEID_PREFIX) &&
+          !i.name.includes('Recipe') &&
+          !i.nameId.includes('_Placeholder'),
       )
       .map((i) => ({
         key: i.guid,
         name: i.name,
         nameId: i.nameId,
         iconPath: i.squareIconPath,
+        isEmblem: i.name.includes('Emblem'),
       }))
 
     const stats: UpsertStats = await ctx.runMutation(

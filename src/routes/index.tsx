@@ -5,6 +5,7 @@ import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
 import { buildTraitTooltipRows } from "../traitTooltip";
+import { getImageUrl } from "~/utils";
 
 export const Route = createFileRoute('/')({
     component: HomeComponent,
@@ -72,9 +73,7 @@ function TraitResultTooltipPortal({
 function HomeComponent() {
     const items = useQuery(api.queries.getItems, { setKey: ACTIVE_SET_KEY }) || [];
     const allChampions = useQuery(api.queries.listChampions, { setKey: ACTIVE_SET_KEY }) || [];
-    const traits = useQuery(api.queries.getTraits, { setKey: ACTIVE_SET_KEY }) || [];
 
-    const [isWorldRunes, setIsWorldRunes] = useState(false);
     const [selectedEmblemKeys, setSelectedEmblemKeys] = useState<string[]>([]);
     const [selectedChampIds, setSelectedChampIds] = useState<string[]>([]);
     const [blockedChampIds, setBlockedChampIds] = useState<string[]>([]);
@@ -84,7 +83,6 @@ function HomeComponent() {
     const [blockFilter, setBlockFilter] = useState<number | null>(null);
 
     const suggest = useAction(api.optimizer.suggestTeams);
-    const suggestWorld = useAction(api.optimizer.suggestWorldRunes);
 
     const [results, setResults] = useState<any[] | null>(null);
     const [loading, setLoading] = useState(false);
@@ -120,16 +118,10 @@ function HomeComponent() {
     // Derived: filter emblems based on mode
     const emblems = items.filter(i => {
         if (!i.name?.toLowerCase().includes("emblem")) return false;
-        if (!isWorldRunes) return true;
-
-        // World Runes mode: only show region emblems
-        const traitName = i.name.replace(" Emblem", "");
-        const trait = traits.find(t => t.name === traitName);
-        return trait?.isRegion;
+        return true;
     });
 
     const addEmblem = (key: string) => {
-        if (isWorldRunes && selectedEmblemKeys.length >= 2) return;
         setSelectedEmblemKeys(prev => [...prev, key]);
     };
 
@@ -167,36 +159,19 @@ function HomeComponent() {
         setLoading(true);
         setResults(null);
         try {
-            if (isWorldRunes) {
-                const res = await suggestWorld({
-                    emblemIds: selectedEmblemKeys,
-                    mustHaveChampIds: selectedChampIds,
-                    blockedChampIds: blockedChampIds
-                });
-                setResults(res);
-            } else {
-                const res = await suggest({
-                    emblemIds: selectedEmblemKeys,
-                    teamSize,
-                    mode: optMode,
-                    mustHaveChampIds: selectedChampIds,
-                    blockedChampIds: blockedChampIds
-                });
-                setResults(res);
-            }
+            const res = await suggest({
+                emblemIds: selectedEmblemKeys,
+                teamSize,
+                mode: optMode,
+                mustHaveChampIds: selectedChampIds,
+                blockedChampIds: blockedChampIds
+            });
+            setResults(res);
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
-    };
-
-    const getImageUrl = (path?: string) => {
-        if (!path) return "";
-        if (path.startsWith("http")) return path;
-        // Community Dragon path resolution
-        const cleanPath = path.toLowerCase().replace("/lol-game-data/assets/", "");
-        return `${(import.meta as any).env.VITE_CDRAGON_PATCH}/${cleanPath}`;
     };
 
     const filteredSelectionChamps = selectionFilter
@@ -229,16 +204,6 @@ function HomeComponent() {
                                     Select Emblems
                                 </h2>
                                 <div className="flex gap-2 items-center">
-                                    <button
-                                        onClick={() => {
-                                            const newMode = !isWorldRunes;
-                                            setIsWorldRunes(newMode);
-                                            setSelectedEmblemKeys([]); // Reset emblems when switching mode
-                                        }}
-                                        className={`text-[10px] px-2 py-1 rounded border transition-all ${isWorldRunes ? 'bg-purple-600 border-purple-400 text-white' : 'bg-gray-800 border-white/10 text-gray-400'}`}
-                                    >
-                                        WORLD RUNES
-                                    </button>
                                     {selectedEmblemKeys.length > 0 && (
                                         <button
                                             onClick={() => setSelectedEmblemKeys([])}
@@ -249,11 +214,6 @@ function HomeComponent() {
                                     )}
                                 </div>
                             </div>
-                            {isWorldRunes && (
-                                <p className="text-[10px] text-purple-400 mb-2 font-bold uppercase tracking-tight">
-                                    Choose max 2 region emblems (target 4+ regions)
-                                </p>
-                            )}
                             <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                                 {emblems.map(emblem => {
                                     const count = getEmblemCount(emblem.key!);
@@ -294,58 +254,54 @@ function HomeComponent() {
                             </div>
                         </section>
 
-                        {!isWorldRunes && (
-                            <>
-                                <section>
-                                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
-                                        Search Strategy
-                                    </h2>
-                                    <div className="grid grid-cols-2 gap-2 bg-gray-800/50 p-1 rounded-xl">
-                                        <button
-                                            onClick={() => setOptMode("wide")}
-                                            className={`py-2 rounded-lg text-xs font-bold transition-all ${optMode === "wide" ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                        >
-                                            Wide
-                                        </button>
-                                        <button
-                                            onClick={() => setOptMode("deep")}
-                                            className={`py-2 rounded-lg text-xs font-bold transition-all ${optMode === "deep" ? 'bg-amber-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                        >
-                                            Deep
-                                        </button>
-                                    </div>
-                                </section>
+                        <section>
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
+                                Search Strategy
+                            </h2>
+                            <div className="grid grid-cols-2 gap-2 bg-gray-800/50 p-1 rounded-xl">
+                                <button
+                                    onClick={() => setOptMode("wide")}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${optMode === "wide" ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    Wide
+                                </button>
+                                <button
+                                    onClick={() => setOptMode("deep")}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${optMode === "deep" ? 'bg-amber-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    Deep
+                                </button>
+                            </div>
+                        </section>
 
-                                <section>
-                                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                        <span className="w-2 h-6 bg-amber-500 rounded-full"></span>
-                                        Team Size
-                                    </h2>
-                                    <div className="flex gap-2">
-                                        {[7, 8, 9, 10].map(size => (
-                                            <button
-                                                key={size}
-                                                onClick={() => setTeamSize(size)}
-                                                className={`flex-1 py-3 rounded-xl font-bold transition-all ${teamSize === size
-                                                    ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
-                                                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                                                    }`}
-                                            >
-                                                Lv.{size}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </section>
-                            </>
-                        )}
+                        <section>
+                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                <span className="w-2 h-6 bg-amber-500 rounded-full"></span>
+                                Team Size
+                            </h2>
+                            <div className="flex gap-2">
+                                {[7, 8, 9, 10].map(size => (
+                                    <button
+                                        key={size}
+                                        onClick={() => setTeamSize(size)}
+                                        className={`flex-1 py-3 rounded-xl font-bold transition-all ${teamSize === size
+                                            ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20'
+                                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        Lv.{size}
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
 
                         <button
                             onClick={handleOptimize}
                             disabled={loading}
-                            className={`w-full py-4 bg-gradient-to-br font-black text-xl rounded-2xl shadow-xl transition-all disabled:opacity-50 active:scale-95 ${isWorldRunes ? 'from-purple-400 to-purple-600 text-white shadow-purple-500/20 hover:from-purple-300 hover:to-purple-500' : 'from-amber-400 to-amber-600 text-black shadow-amber-500/20 hover:from-amber-300 hover:to-amber-500'}`}
+                            className={`w-full py-4 bg-gradient-to-br font-black text-xl rounded-2xl shadow-xl transition-all disabled:opacity-50 active:scale-95 from-amber-400 to-amber-600 text-black shadow-amber-500/20 hover:from-amber-300 hover:to-amber-500`}
                         >
-                            {loading ? "SEARCHING..." : isWorldRunes ? "ACTIVATE RUNES" : "GENERATE TEAMS"}
+                            {loading ? "SEARCHING..." : "GENERATE TEAMS"}
                         </button>
                     </div>
 

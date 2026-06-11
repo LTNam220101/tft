@@ -40,6 +40,7 @@ export const item = v.object({
   name: v.optional(v.string()),
   nameId: v.optional(v.string()),
   iconPath: v.optional(v.string()),
+  isEmblem: v.optional(v.boolean()),
 })
 
 export default defineSchema({
