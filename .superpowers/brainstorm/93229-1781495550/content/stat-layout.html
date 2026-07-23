@@ -1,0 +1,127 @@
+<h2>Đặt stat calculator ở đâu?</h2>
+<p class="subtitle">Khi click vào tướng trên board, chỉ số sẽ hiện ra ở vị trí nào?</p>
+
+<div class="cards">
+
+  <!-- Option A: Right panel -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0a0a0f;border-radius:8px;padding:10px;font-family:monospace;font-size:11px;color:#9ca3af;min-height:180px">
+        <div style="display:flex;gap:8px;height:100%">
+          <!-- traits -->
+          <div style="width:36px;background:#16161f;border-radius:6px;padding:4px 2px;font-size:8px;color:#6b7280">
+            <div style="background:#f59e0b22;border:1px solid #f59e0b44;border-radius:3px;padding:2px;margin-bottom:2px;font-size:7px;color:#fbbf24">Psionic 4</div>
+            <div style="background:#ffffff08;border:1px solid #ffffff10;border-radius:3px;padding:2px;margin-bottom:2px;font-size:7px">Mar 2</div>
+          </div>
+          <!-- board -->
+          <div style="flex:1;background:#16161f;border-radius:6px;padding:6px">
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+              <div style="width:22px;height:25px;background:#a855f744;border-radius:3px;border:1px solid #a855f7"></div>
+              <div style="width:22px;height:25px;background:#f59e0b44;border-radius:3px;border:1px solid #f59e0b;box-shadow:0 0 6px #f59e0b88"></div>
+              <div style="width:22px;height:25px;background:#3b82f644;border-radius:3px;border:1px solid #3b82f6"></div>
+              <div style="width:22px;height:25px;background:#22c55e44;border-radius:3px;border:1px solid #22c55e"></div>
+              <div style="width:22px;height:25px;background:#ffffff08;border-radius:3px;border:1px solid #ffffff10"></div>
+            </div>
+          </div>
+          <!-- STAT PANEL RIGHT -->
+          <div style="width:80px;background:#16161f;border-radius:6px;padding:6px;border:2px solid #f59e0b44">
+            <div style="font-size:8px;color:#f59e0b;font-weight:bold;margin-bottom:4px">⭐⭐ Master Yi</div>
+            <div style="font-size:7px;color:#9ca3af;line-height:1.8">
+              <div style="display:flex;justify-content:space-between"><span>❤ HP</span><span style="color:#ef4444">1980</span></div>
+              <div style="display:flex;justify-content:space-between"><span>⚔ AD</span><span style="color:#f97316">90</span></div>
+              <div style="display:flex;justify-content:space-between"><span>🛡 Armor</span><span style="color:#3b82f6">65</span></div>
+              <div style="display:flex;justify-content:space-between"><span>💫 MR</span><span style="color:#8b5cf6">65</span></div>
+              <div style="display:flex;justify-content:space-between"><span>⚡ AS</span><span style="color:#fbbf24">0.85</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Panel bên phải</h3>
+      <p>Stat panel hiện cạnh phải của board. Luôn visible khi có tướng được chọn. Tốt cho so sánh nhanh.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Bottom expand panel -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0a0a0f;border-radius:8px;padding:10px;font-family:monospace;font-size:11px;color:#9ca3af;min-height:180px">
+        <div style="display:flex;gap:8px">
+          <!-- traits -->
+          <div style="width:36px;background:#16161f;border-radius:6px;padding:4px 2px;font-size:8px;color:#6b7280">
+            <div style="background:#f59e0b22;border:1px solid #f59e0b44;border-radius:3px;padding:2px;margin-bottom:2px;font-size:7px;color:#fbbf24">Psionic 4</div>
+            <div style="background:#ffffff08;border:1px solid #ffffff10;border-radius:3px;padding:2px;margin-bottom:2px;font-size:7px">Mar 2</div>
+          </div>
+          <div style="flex:1">
+            <!-- board -->
+            <div style="background:#16161f;border-radius:6px;padding:6px;margin-bottom:6px">
+              <div style="display:flex;gap:3px;flex-wrap:wrap">
+                <div style="width:22px;height:25px;background:#a855f744;border-radius:3px;border:1px solid #a855f7"></div>
+                <div style="width:22px;height:25px;background:#f59e0b44;border-radius:3px;border:1px solid #f59e0b;box-shadow:0 0 6px #f59e0b88"></div>
+                <div style="width:22px;height:25px;background:#3b82f644;border-radius:3px;border:1px solid #3b82f6"></div>
+                <div style="width:22px;height:25px;background:#22c55e44;border-radius:3px;border:1px solid #22c55e"></div>
+              </div>
+            </div>
+            <!-- STAT PANEL BELOW BOARD -->
+            <div style="background:#16161f;border-radius:6px;padding:6px;border:2px solid #f59e0b44">
+              <div style="font-size:8px;color:#f59e0b;font-weight:bold;margin-bottom:4px">⭐⭐ Master Yi — Stats</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;font-size:7px;color:#9ca3af">
+                <div style="background:#0a0a0f;border-radius:3px;padding:3px;text-align:center"><div style="color:#ef4444;font-weight:bold">1980</div><div>HP</div></div>
+                <div style="background:#0a0a0f;border-radius:3px;padding:3px;text-align:center"><div style="color:#f97316;font-weight:bold">90</div><div>AD</div></div>
+                <div style="background:#0a0a0f;border-radius:3px;padding:3px;text-align:center"><div style="color:#3b82f6;font-weight:bold">65</div><div>Armor</div></div>
+                <div style="background:#0a0a0f;border-radius:3px;padding:3px;text-align:center"><div style="color:#8b5cf6;font-weight:bold">65</div><div>MR</div></div>
+                <div style="background:#0a0a0f;border-radius:3px;padding:3px;text-align:center"><div style="color:#fbbf24;font-weight:bold">0.85</div><div>AS</div></div>
+                <div style="background:#0a0a0f;border-radius:3px;padding:3px;text-align:center"><div style="color:#a855f7;font-weight:bold">25%</div><div>Crit</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Panel bên dưới board</h3>
+      <p>Stat hiện ra trong một row ngang bên dưới board, dạng grid stats. Dùng không gian ngang tốt hơn.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Floating tooltip/popup -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0a0a0f;border-radius:8px;padding:10px;font-family:monospace;font-size:11px;color:#9ca3af;min-height:180px;position:relative">
+        <div style="display:flex;gap:8px">
+          <div style="width:36px;background:#16161f;border-radius:6px;padding:4px 2px;font-size:8px;color:#6b7280">
+            <div style="background:#f59e0b22;border:1px solid #f59e0b44;border-radius:3px;padding:2px;margin-bottom:2px;font-size:7px;color:#fbbf24">Psionic 4</div>
+          </div>
+          <div style="background:#16161f;border-radius:6px;padding:6px;flex:1">
+            <div style="display:flex;gap:3px;flex-wrap:wrap;position:relative">
+              <div style="width:22px;height:25px;background:#a855f744;border-radius:3px;border:1px solid #a855f7"></div>
+              <!-- selected hex with popup -->
+              <div style="position:relative">
+                <div style="width:22px;height:25px;background:#f59e0b44;border-radius:3px;border:1px solid #f59e0b;box-shadow:0 0 6px #f59e0b88"></div>
+                <!-- Floating popup -->
+                <div style="position:absolute;top:-70px;left:-20px;background:#1a1a2e;border:1px solid #f59e0b66;border-radius:6px;padding:6px;width:90px;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,0.8)">
+                  <div style="font-size:7px;color:#f59e0b;font-weight:bold;margin-bottom:3px">⭐⭐ Master Yi</div>
+                  <div style="font-size:7px;color:#9ca3af;line-height:1.8">
+                    <div style="display:flex;justify-content:space-between"><span>HP</span><span style="color:#ef4444">1980</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>AD</span><span style="color:#f97316">90</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>Armor</span><span style="color:#3b82f6">65</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>MR</span><span style="color:#8b5cf6">65</span></div>
+                  </div>
+                  <div style="position:absolute;bottom:-5px;left:25px;width:8px;height:8px;background:#1a1a2e;border-right:1px solid #f59e0b66;border-bottom:1px solid #f59e0b66;transform:rotate(45deg)"></div>
+                </div>
+              </div>
+              <div style="width:22px;height:25px;background:#3b82f644;border-radius:3px;border:1px solid #3b82f6"></div>
+              <div style="width:22px;height:25px;background:#22c55e44;border-radius:3px;border:1px solid #22c55e"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Floating popup trên hex</h3>
+      <p>Tooltip floating xuất hiện ngay trên ô hex khi hover/click. Không chiếm thêm không gian, nhưng có thể bị che khuất.</p>
+    </div>
+  </div>
+
+</div>

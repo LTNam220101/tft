@@ -17,6 +17,19 @@ export const champion = v.object({
   iconPath: v.optional(v.string()),
   path: v.optional(v.string()), // e.g. Characters/TFT17_Ahri
   isLocked: v.optional(v.boolean()),
+  /** Base stats at 1-star, sourced from cdragon/tft/en_us.json */
+  stats: v.optional(v.object({
+    hp: v.optional(v.number()),
+    damage: v.optional(v.number()),
+    armor: v.optional(v.number()),
+    magicResist: v.optional(v.number()),
+    attackSpeed: v.optional(v.number()),
+    mana: v.optional(v.number()),
+    initialMana: v.optional(v.number()),
+    range: v.optional(v.number()),
+    critChance: v.optional(v.number()),
+    critMultiplier: v.optional(v.number()),
+  })),
 })
 
 // Trait schema based on tfttraits.json
@@ -41,6 +54,8 @@ export const item = v.object({
   nameId: v.optional(v.string()),
   iconPath: v.optional(v.string()),
   isEmblem: v.optional(v.boolean()),
+  /** Stat bonuses from cdragon/tft/en_us.json — AD is fractional (0.1 = +10% base AD), HP/Armor/etc are flat */
+  effects: v.optional(v.record(v.string(), v.number())),
 })
 
 export default defineSchema({

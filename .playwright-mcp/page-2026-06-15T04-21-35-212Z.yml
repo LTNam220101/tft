@@ -1,0 +1,62 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "T-Flex-T" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e5]:
+        - link "Optimizer" [ref=e6] [cursor=pointer]:
+          - /url: /
+        - link "Builder" [ref=e7] [cursor=pointer]:
+          - /url: /builder
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - link "Optimizer" [ref=e11] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e12]: /
+      - generic [ref=e13]: Team Builder
+    - generic [ref=e14]:
+      - generic [ref=e16]:
+        - heading "Traits" [level=2] [ref=e17]
+        - paragraph [ref=e18]: Place champions
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: Board 0 / 10
+          - button "Clear" [ref=e23]
+        - generic [ref=e114]:
+          - generic [ref=e117]: $1
+          - generic [ref=e120]: $2
+          - generic [ref=e123]: $3
+          - generic [ref=e126]: $4
+          - generic [ref=e129]: $5
+        - generic [ref=e130]:
+          - generic [ref=e131]: Suggest Lv.
+          - generic [ref=e132]:
+            - button "7" [ref=e133]
+            - button "8" [ref=e134]
+            - button "9" [ref=e135]
+            - button "10" [ref=e136]
+          - button "Suggest Lv.9 →" [disabled] [ref=e137]
+    - generic [ref=e138]:
+      - generic [ref=e140]:
+        - heading "Units" [level=2] [ref=e141]
+        - generic [ref=e142]: Click or drag to place
+        - generic [ref=e143]:
+          - textbox "Search…" [ref=e144]
+          - button "ALL" [ref=e145]
+          - button "$1" [ref=e146]
+          - button "$2" [ref=e147]
+          - button "$3" [ref=e148]
+          - button "$4" [ref=e149]
+          - button "$5" [ref=e150]
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - heading "Items" [level=2] [ref=e153]
+          - generic [ref=e154]: Drag onto a unit
+          - textbox "Search…" [ref=e156]
+        - generic [ref=e157]:
+          - button "all" [ref=e158]
+          - button "normal" [ref=e159]
+          - button "emblem" [ref=e160]
+          - button "radiant" [ref=e161]
+          - button "artifact" [ref=e162]
+        - paragraph [ref=e163]: No items in DB — re-run seed to load all items.

@@ -274,6 +274,158 @@ function ItemCard({ item, onDragStart }: { item: any; onDragStart: (e: React.Dra
     );
 }
 
+// ── Stat calculation ──────────────────────────────────────────────────────────
+type ComputedStats = {
+    hp: number; ad: number; armor: number; mr: number;
+    as: number; mana: number; initialMana: number; range: number; crit: number;
+};
+
+const HP_MULT: Record<1 | 2 | 3, number> = { 1: 1.0, 2: 1.8, 3: 3.24 };
+const AD_MULT: Record<1 | 2 | 3, number> = { 1: 1.0, 2: 1.5, 3: 2.25 };
+
+function calcStats(
+    champ: any,
+    star: 1 | 2 | 3,
+    equippedItemKeys: string[],
+    itemsByKey: Map<string, any>,
+): ComputedStats | null {
+    const base = champ?.stats;
+    if (!base) return null;
+
+    const scaledHp = (base.hp ?? 0) * HP_MULT[star];
+    const scaledAd = (base.damage ?? 0) * AD_MULT[star];
+
+    let adPct = 0;    // fractional — 0.10 = +10% of scaled base AD
+    let hpFlat = 0;
+    let armorFlat = 0;
+    let mrFlat = 0;
+    let asFlat = 0;
+
+    for (const ik of equippedItemKeys) {
+        const fx = itemsByKey.get(ik)?.effects;
+        if (!fx) continue;
+        if (fx.AD != null) adPct += fx.AD;
+        if (fx.Health != null) hpFlat += fx.Health;
+        if (fx.Armor != null) armorFlat += fx.Armor;
+        if (fx.MagicResist != null) mrFlat += fx.MagicResist;
+        if (fx.AttackSpeed != null) asFlat += fx.AttackSpeed;
+    }
+
+    return {
+        hp: Math.round(scaledHp + hpFlat),
+        ad: Math.round(scaledAd * (1 + adPct)),
+        armor: (base.armor ?? 0) + armorFlat,
+        mr: (base.magicResist ?? 0) + mrFlat,
+        as: parseFloat(((base.attackSpeed ?? 0) + asFlat).toFixed(3)),
+        mana: base.mana ?? 0,
+        initialMana: base.initialMana ?? 0,
+        range: base.range ?? 0,
+        crit: base.critChance ?? 0.25,
+    };
+}
+
+// ── StatPanel ─────────────────────────────────────────────────────────────────
+function StatPanel({
+    champ, star, equippedItemKeys, itemsByKey, isOnBoard,
+    onStarChange, onRemoveFromBoard,
+}: {
+    champ: any;
+    star: 1 | 2 | 3;
+    equippedItemKeys: string[];
+    itemsByKey: Map<string, any>;
+    isOnBoard: boolean;
+    onStarChange: (s: 1 | 2 | 3) => void;
+    onRemoveFromBoard: () => void;
+}) {
+    const stats = calcStats(champ, star, equippedItemKeys, itemsByKey);
+    const border = costBorder(champ.cost);
+
+    return (
+        <div className="w-52 shrink-0 sticky top-4">
+            <div className="bg-[#16161f] rounded-2xl border border-white/5 p-3 space-y-3">
+                {/* Header */}
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0" style={{ border: `2px solid ${border}` }}>
+                        <img src={getImageUrl(champ.iconPath)} alt={champ.name} className="w-full h-full object-cover object-top" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-gray-100 truncate">{champ.name}</p>
+                        <p className="text-[10px] text-gray-500">${champ.cost} cost</p>
+                    </div>
+                </div>
+
+                {/* Star selector */}
+                <div className="flex gap-1">
+                    {([1, 2, 3] as const).map(s => (
+                        <button
+                            key={s}
+                            onClick={() => onStarChange(s)}
+                            className={`flex-1 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                                star === s
+                                    ? "bg-amber-500/20 border-amber-500/60 text-amber-300"
+                                    : "bg-white/5 border-white/10 text-gray-500 hover:text-gray-300"
+                            }`}
+                        >
+                            {"★".repeat(s)}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Stats */}
+                {!stats ? (
+                    <p className="text-[10px] text-gray-600 italic text-center py-2">
+                        Stats unavailable — re-run seed
+                    </p>
+                ) : (
+                    <div className="space-y-1.5">
+                        {([
+                            { label: "HP",    value: stats.hp,                          color: "text-red-400" },
+                            { label: "AD",    value: stats.ad,                          color: "text-orange-400" },
+                            { label: "Armor", value: stats.armor,                       color: "text-blue-400" },
+                            { label: "MR",    value: stats.mr,                          color: "text-purple-400" },
+                            { label: "AS",    value: stats.as,                          color: "text-yellow-400" },
+                            { label: "Mana",  value: `${stats.initialMana}/${stats.mana}`, color: "text-cyan-400" },
+                            { label: "Range", value: stats.range,                       color: "text-gray-300" },
+                            { label: "Crit",  value: `${Math.round(stats.crit * 100)}%`, color: "text-pink-400" },
+                        ] as const).map(({ label, value, color }) => (
+                            <div key={label} className="flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500">{label}</span>
+                                <span className={`text-[11px] font-mono font-bold ${color}`}>{value}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Items equipped */}
+                {equippedItemKeys.length > 0 && stats && (
+                    <div className="pt-1 border-t border-white/5">
+                        <p className="text-[9px] text-gray-600 uppercase tracking-widest mb-1.5">Items</p>
+                        <div className="flex gap-1.5">
+                            {equippedItemKeys.map((ik) => {
+                                const it = itemsByKey.get(ik);
+                                return it ? (
+                                    <img key={ik} src={getImageUrl(it.iconPath)} alt={it.name} title={it.name}
+                                        className="w-7 h-7 rounded object-cover border border-white/15" />
+                                ) : null;
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Remove button */}
+                {isOnBoard && (
+                    <button
+                        onClick={onRemoveFromBoard}
+                        className="w-full py-1 rounded-lg text-[10px] text-red-500 border border-red-500/20 hover:bg-red-500/10 transition-all"
+                    >
+                        Remove from board
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 function BuilderComponent() {
     const allChampions = useQuery(api.queries.listChampions, { setKey: ACTIVE_SET_KEY }) ?? [];
@@ -290,6 +442,7 @@ function BuilderComponent() {
     const [slots, setSlots] = useState<(string | null)[]>(Array(28).fill(null));
     const [champItems, setChampItems] = useState<Record<string, string[]>>({});
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [champStars, setChampStars] = useState<Record<string, 1 | 2 | 3>>({});
 
     // ── Units picker ─────────────────────────────────────────────────────────
     const [champSearch, setChampSearch]     = useState("");
@@ -313,6 +466,10 @@ function BuilderComponent() {
     // ── Derived ──────────────────────────────────────────────────────────────
     const boardCount    = useMemo(() => slots.filter(Boolean).length, [slots]);
     const boardChampKeys = useMemo(() => new Set(slots.filter(Boolean) as string[]), [slots]);
+
+    const selectedChamp = selectedKey ? champByKey.get(selectedKey) ?? null : null;
+    const selectedStar  = (selectedKey ? champStars[selectedKey] : null) ?? 1 as 1 | 2 | 3;
+    const selectedItems = selectedKey ? (champItems[selectedKey] ?? []) : [];
 
     const activeTraits = useMemo(
         () => computeTraits(slots, champByKey, traitByKey, champItems, itemsByKey, traitByName),
@@ -343,11 +500,23 @@ function BuilderComponent() {
     }, [allItems, itemTypeFilter, itemSearch]);
 
     // ── Board interactions ────────────────────────────────────────────────────
+    function setChampStar(key: string, star: 1 | 2 | 3) {
+        setChampStars(prev => ({ ...prev, [key]: star }));
+    }
+
+    function removeSelectedFromBoard() {
+        if (!selectedKey) return;
+        const key = selectedKey;
+        setSlots(prev => prev.map(k => (k === key ? null : k)));
+        setChampItems(prev => { const n = { ...prev }; delete n[key]; return n; });
+        setSelectedKey(null);
+    }
+
     function handleHexClick(idx: number) {
         const occupant = slots[idx];
         if (occupant) {
             if (selectedKey && selectedKey !== occupant) {
-                // Move selected champion here (swap)
+                // Swap selected champion into this hex
                 const next = [...slots];
                 const oldIdx = next.indexOf(selectedKey);
                 if (oldIdx !== -1) next[oldIdx] = occupant;
@@ -355,16 +524,14 @@ function BuilderComponent() {
                 setSlots(next);
                 setSelectedKey(null);
             } else if (selectedKey === occupant) {
+                // Deselect
                 setSelectedKey(null);
             } else {
-                // Remove champion
-                const next = [...slots];
-                next[idx] = null;
-                setSlots(next);
-                setChampItems(prev => { const n = { ...prev }; delete n[occupant]; return n; });
+                // First click → select for inspection / stat panel
+                setSelectedKey(occupant);
             }
         } else if (selectedKey) {
-            // Place selected champion
+            // Place selected champion into empty hex
             const next = [...slots];
             const oldIdx = next.indexOf(selectedKey);
             if (oldIdx !== -1) next[oldIdx] = null;
@@ -540,8 +707,8 @@ function BuilderComponent() {
                         </div>
                     </div>
 
-                    {/* Board */}
-                    <div className="flex-1 min-w-0 space-y-3">
+                    {/* Board — shrinks slightly when stat panel is open */}
+                    <div className="min-w-0 space-y-3" style={{ flex: selectedChamp ? "1 1 0" : "1 1 auto" }}>
                         <div className="bg-[#16161f] rounded-2xl border border-white/5 p-4">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="text-xs font-bold uppercase tracking-widest text-gray-500">
@@ -549,7 +716,7 @@ function BuilderComponent() {
                                     <span className="text-gray-600"> / 10</span>
                                 </span>
                                 <button
-                                    onClick={() => { setSlots(Array(28).fill(null)); setSelectedKey(null); setChampItems({}); }}
+                                    onClick={() => { setSlots(Array(28).fill(null)); setSelectedKey(null); setChampItems({}); setChampStars({}); }}
                                     className="text-xs text-gray-600 hover:text-red-400 transition-colors"
                                 >
                                     Clear
@@ -701,6 +868,19 @@ function BuilderComponent() {
                             </div>
                         )}
                     </div>
+
+                    {/* Stat panel */}
+                    {selectedChamp && (
+                        <StatPanel
+                            champ={selectedChamp}
+                            star={selectedStar}
+                            equippedItemKeys={selectedItems}
+                            itemsByKey={itemsByKey}
+                            isOnBoard={boardChampKeys.has(selectedKey!)}
+                            onStarChange={s => setChampStar(selectedKey!, s)}
+                            onRemoveFromBoard={removeSelectedFromBoard}
+                        />
+                    )}
                 </div>
 
                 {/* ── BOTTOM ROW: Units + Items ───────────────────────────── */}

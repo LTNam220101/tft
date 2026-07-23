@@ -10,6 +10,7 @@ import { champion, item, trait } from '../schema'
 const CDRAGON_PATCH = 'pbe'
 
 const BASE = `https://raw.communitydragon.org/${CDRAGON_PATCH}/plugins/rcp-be-lol-game-data/global/default/v1`
+const CDRAGON_TFT = `https://raw.communitydragon.org/${CDRAGON_PATCH}/cdragon/tft/en_us.json`
 
 /** Key in tftchampions-teamplanner.json (e.g. TFTSet17). */
 const SET_CHAMPIONS_KEY = 'TFTSet17' as const
@@ -59,6 +60,24 @@ interface RawTrait {
   }>
 }
 
+/** Remove null/undefined entries from a flat number record (for item effects). */
+function filterNullRecord(obj: Record<string, number | null | undefined> | undefined): Record<string, number> | undefined {
+  if (!obj) return undefined
+  const result: Record<string, number> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v != null) result[k] = v
+  }
+  return Object.keys(result).length ? result : undefined
+}
+
+/** Remove null values from a typed object so v.optional validators don't reject them. */
+function stripNulls<T extends object>(obj: T | undefined): { [K in keyof T]?: Exclude<T[K], null> } | undefined {
+  if (!obj) return undefined
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v != null)
+  ) as { [K in keyof T]?: Exclude<T[K], null> }
+}
+
 /** Innate-only (used as base for merge). */
 function flattenInnateConstants(t: RawTrait): Record<string, number> {
   const map: Record<string, number> = {}
@@ -79,6 +98,28 @@ interface RawItem {
   squareIconPath: string
 }
 
+interface CdragonChampion {
+  apiName: string
+  stats?: {
+    hp?: number
+    damage?: number
+    armor?: number
+    magicResist?: number
+    attackSpeed?: number
+    mana?: number
+    initialMana?: number
+    range?: number
+    critChance?: number
+    critMultiplier?: number
+  }
+}
+
+interface CdragonItem {
+  apiName: string
+  effects?: Record<string, number>
+}
+
+
 type UpsertStats = {
   championsInserted: number
   championsUpdated: number
@@ -96,11 +137,24 @@ export const seedFromApi = action({
     traits: number
     items: number
   } & UpsertStats> => {
-    const [championsJson, traitsJson, itemsJson] = await Promise.all([
+    const [championsJson, traitsJson, itemsJson, cdragonJson] = await Promise.all([
       fetch(`${BASE}/tftchampions-teamplanner.json`).then((r) => r.json()),
       fetch(`${BASE}/tfttraits.json`).then((r) => r.json()),
       fetch(`${BASE}/tftitems.json`).then((r) => r.json()),
+      fetch(CDRAGON_TFT).then((r) => r.json()),
     ])
+
+    // Build lookup maps from cdragon data
+    const cdragon = cdragonJson as { sets?: Record<string, { champions?: CdragonChampion[] }>; items?: CdragonItem[] }
+    const set17Champions: CdragonChampion[] = cdragon.sets?.['17']?.champions ?? []
+    const champStatsMap = new Map<string, CdragonChampion['stats']>(
+      set17Champions.map((c) => [c.apiName, c.stats]),
+    )
+    const itemEffectsMap = new Map<string, Record<string, number>>(
+      (cdragon.items ?? [])
+        .filter((i) => i.effects != null)
+        .map((i) => [i.apiName, i.effects!]),
+    )
 
     const championSetRaw = (championsJson as Record<string, RawChampion[] | undefined>)?.[
       SET_CHAMPIONS_KEY
@@ -120,6 +174,7 @@ export const seedFromApi = action({
         traits: c.traits || [],
         iconPath: c.squareIconPath,
         path: c.path,
+        stats: stripNulls(champStatsMap.get(c.character_id)),
       }))
 
     if (champions.length === 0) {
@@ -162,6 +217,7 @@ export const seedFromApi = action({
         nameId: i.nameId,
         iconPath: i.squareIconPath,
         isEmblem: i.name.includes('Emblem'),
+        effects: filterNullRecord(itemEffectsMap.get(i.nameId)),
       }))
 
     const stats: UpsertStats = await ctx.runMutation(

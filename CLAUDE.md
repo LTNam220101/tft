@@ -21,7 +21,7 @@ npm start            # Run production server from .output/server/index.mjs
 
 **Backend:** [Convex](https://convex.dev) — serverless database + functions. All backend logic lives in `convex/`. `ACTIVE_SET_KEY` in `convex/gameConfig.ts` controls which TFT set the UI uses (currently `"TFTSet17"`).
 
-**Server runtime:** Nitro SSR (output to `.output/`), deployed via Docker on a VPS.
+**Server runtime:** Nitro SSR, deployed to Vercel (`vercel` Nitro preset, selected automatically when `process.env.VERCEL` is set — see `vite.config.ts`).
 
 **Game data source:** Community Dragon API, fetched and seeded via `convex/mutations/seed.ts`. CDN base URL configured by `VITE_CDRAGON_PATCH` env var.
 
@@ -72,9 +72,8 @@ All fields are `v.optional(...)` to support multi-set data in the same tables. D
 
 ## Deployment
 
-Push to `master` triggers `.github/workflows/deploy-master.yml`:
-1. Deploy Convex functions to production (`npx convex deploy`)
-2. Build Docker image with `VITE_CONVEX_URL` + `VITE_CDRAGON_PATCH` baked in
-3. Push to Docker Hub and SSH-deploy to VPS
+Push to `master` triggers `.github/workflows/deploy-master.yml`, which deploys Convex functions to production (`npx convex deploy`).
+
+The frontend is deployed separately by Vercel's Git Integration (connected directly to this repo in the Vercel dashboard) — it builds and deploys on every push to `master` independently of the GitHub Actions workflow. `VITE_CONVEX_URL` and `VITE_CDRAGON_PATCH` are configured as environment variables in the Vercel project settings, not baked in via CI.
 
 To switch to a new TFT set: update `ACTIVE_SET_KEY` in `convex/gameConfig.ts`, run seed, and redeploy.

@@ -1,0 +1,88 @@
+<h2>Cách set cấp sao cho tướng</h2>
+<p class="subtitle">Khi click tướng trên board → right panel hiện ra. Star level chọn ở đâu?</p>
+
+<div class="cards">
+
+  <!-- Option A: Stars in right panel -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0a0a0f;border-radius:8px;padding:10px;font-family:sans-serif;font-size:11px;color:#9ca3af;min-height:200px;display:flex;gap:8px">
+        <!-- board -->
+        <div style="flex:1;background:#16161f;border-radius:6px;padding:6px">
+          <div style="font-size:8px;color:#6b7280;margin-bottom:4px">Board</div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <div style="width:26px;height:30px;background:#f59e0b44;border-radius:3px;border:2px solid #f59e0b;position:relative">
+              <!-- no star indicator on hex -->
+            </div>
+            <div style="width:26px;height:30px;background:#3b82f644;border-radius:3px;border:1px solid #3b82f6"></div>
+            <div style="width:26px;height:30px;background:#a855f744;border-radius:3px;border:1px solid #a855f7"></div>
+          </div>
+        </div>
+        <!-- right stat panel -->
+        <div style="width:110px;background:#16161f;border-radius:6px;padding:8px;border:1px solid #f59e0b44">
+          <div style="font-size:9px;color:#f59e0b;font-weight:bold;margin-bottom:6px">Master Yi</div>
+          <!-- Star selector IN panel -->
+          <div style="display:flex;gap:3px;margin-bottom:8px">
+            <button style="flex:1;padding:2px;background:#6b728022;border:1px solid #6b7280;border-radius:3px;font-size:8px;color:#9ca3af">★</button>
+            <button style="flex:1;padding:2px;background:#f59e0b33;border:1px solid #f59e0b;border-radius:3px;font-size:8px;color:#f59e0b;font-weight:bold">★★</button>
+            <button style="flex:1;padding:2px;background:#6b728022;border:1px solid #6b7280;border-radius:3px;font-size:8px;color:#9ca3af">★★★</button>
+          </div>
+          <div style="font-size:7px;line-height:2">
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">HP</span><span style="color:#ef4444;font-weight:bold">1980</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">AD</span><span style="color:#f97316;font-weight:bold">90</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">Armor</span><span style="color:#3b82f6;font-weight:bold">65</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">MR</span><span style="color:#8b5cf6;font-weight:bold">65</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">AS</span><span style="color:#fbbf24;font-weight:bold">0.85</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Chọn sao trong stat panel</h3>
+      <p>Panel bên phải có 3 button ★/★★/★★★. Click tướng → panel mở → chọn sao. Đơn giản, gọn.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Stars on hex itself -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0a0a0f;border-radius:8px;padding:10px;font-family:sans-serif;font-size:11px;color:#9ca3af;min-height:200px;display:flex;gap:8px">
+        <!-- board -->
+        <div style="flex:1;background:#16161f;border-radius:6px;padding:6px">
+          <div style="font-size:8px;color:#6b7280;margin-bottom:4px">Board — right-click hoặc long press để đổi sao</div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <!-- hex with 2 stars shown at bottom -->
+            <div style="width:26px;height:30px;background:#f59e0b44;border-radius:3px;border:2px solid #f59e0b;position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px">
+              <span style="font-size:7px;line-height:1;color:#f59e0b">★★</span>
+            </div>
+            <!-- hex with 1 star -->
+            <div style="width:26px;height:30px;background:#3b82f644;border-radius:3px;border:1px solid #3b82f6;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px">
+              <span style="font-size:7px;line-height:1;color:#9ca3af">★</span>
+            </div>
+            <!-- hex with 3 stars -->
+            <div style="width:26px;height:30px;background:#a855f744;border-radius:3px;border:1px solid #a855f7;display:flex;align-items:flex-end;justify-content:center;padding-bottom:1px">
+              <span style="font-size:7px;line-height:1;color:#fbbf24">★★★</span>
+            </div>
+          </div>
+        </div>
+        <!-- right stat panel no star selector -->
+        <div style="width:110px;background:#16161f;border-radius:6px;padding:8px;border:1px solid #f59e0b44">
+          <div style="font-size:9px;color:#f59e0b;font-weight:bold;margin-bottom:2px">Master Yi ★★</div>
+          <div style="font-size:7px;color:#6b7280;margin-bottom:6px">Sao hiện trên hex</div>
+          <div style="font-size:7px;line-height:2">
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">HP</span><span style="color:#ef4444;font-weight:bold">1980</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">AD</span><span style="color:#f97316;font-weight:bold">90</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">Armor</span><span style="color:#3b82f6;font-weight:bold">65</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">MR</span><span style="color:#8b5cf6;font-weight:bold">65</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">AS</span><span style="color:#fbbf24;font-weight:bold">0.85</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Sao hiện trực tiếp trên hex</h3>
+      <p>Mỗi hex hiện ★/★★/★★★ nhỏ bên dưới. Click hex cycling qua các cấp sao (1→2→3→1). Trực quan hơn, giống game thật.</p>
+    </div>
+  </div>
+
+</div>

@@ -15,7 +15,11 @@ export default defineConfig({
       projects: ['./tsconfig.json'],
     }),
     tanstackStart(),
-    nitro(),
+    nitro({
+      // Vercel sets VERCEL=1 during its build — falls back to the default
+      // node-server preset for local builds / `npm start`.
+      preset: process.env.VERCEL ? 'vercel' : undefined,
+    }),
     viteReact(),
   ],
 })
