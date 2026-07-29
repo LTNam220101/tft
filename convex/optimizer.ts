@@ -5,7 +5,7 @@ import { ACTIVE_SET_KEY } from './gameConfig'
 import { scoreCoreTraitContribution, setSpecificTeamScoreDelta } from './optimizerSetBonuses'
 import {
   applyMissFortuneOptionalTraitToCounts,
-  isMissFortuneChampion,
+  // isMissFortuneChampion,
   // nativeCountsWithMissFortuneVirtual,
   // TFT17_MF_OPTIONAL_TRAITS,
   teamHasMissFortune,
@@ -127,7 +127,7 @@ export const suggestTeams = action({
         beam[0].champions,
         ACTIVE_SET_KEY,
         teamSize,
-        null,
+        // null,
       )
     // }
 
@@ -231,7 +231,7 @@ export const suggestTeams = action({
             newTeam,
             ACTIVE_SET_KEY,
             teamSize,
-            mfBranch,
+            // mfBranch,
           )
 
           nextCandidates.push({
