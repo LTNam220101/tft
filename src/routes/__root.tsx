@@ -8,7 +8,7 @@ import {
 import * as React from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import appCss from '~/styles/app.css?url'
-import { SpeedInsights } from '@vercel/speed-insights/next';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // const PLATFORMS = [
 //   { value: "vn2", label: "VN" },
