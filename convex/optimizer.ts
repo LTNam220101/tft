@@ -6,8 +6,8 @@ import { scoreCoreTraitContribution, setSpecificTeamScoreDelta } from './optimiz
 import {
   applyMissFortuneOptionalTraitToCounts,
   isMissFortuneChampion,
-  nativeCountsWithMissFortuneVirtual,
-  TFT17_MF_OPTIONAL_TRAITS,
+  // nativeCountsWithMissFortuneVirtual,
+  // TFT17_MF_OPTIONAL_TRAITS,
   teamHasMissFortune,
 } from './optimizerMissFortune'
 
@@ -74,7 +74,7 @@ export const suggestTeams = action({
     }
 
     // Set 17 + Miss Fortune locked: 3 beam branches (one optional trait each).
-    const lockedHasMissFortune = teamHasMissFortune(lockedInChamps)
+    // const lockedHasMissFortune = teamHasMissFortune(lockedInChamps)
     let beam: any[]
     // if (ACTIVE_SET_KEY === 'TFTSet17' && lockedHasMissFortune) {
     //   beam = TFT17_MF_OPTIONAL_TRAITS.map((branch) => {
@@ -186,8 +186,8 @@ export const suggestTeams = action({
           ].sort()
           const teamKey = newTeamKeys.join(',')
 
-          const stateHasMf = teamHasMissFortune(state.champions)
-          const candIsMf = isMissFortuneChampion(candidate)
+          // const stateHasMf = teamHasMissFortune(state.champions)
+          // const candIsMf = isMissFortuneChampion(candidate)
 
           // if (ACTIVE_SET_KEY === 'TFTSet17' && candIsMf && !stateHasMf) {
           //   for (const branch of TFT17_MF_OPTIONAL_TRAITS) {
@@ -486,7 +486,7 @@ function calculateTeamScoreFromCounts(
   team: any[],
   setKey: string,
   targetTeamSize: number,
-  mfOptionalTrait: string | null,
+  // mfOptionalTrait: string | null,
 ) {
   let rawTraitCounts: Record<string, number> = { ...nativeCounts }
 
