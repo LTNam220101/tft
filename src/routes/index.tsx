@@ -186,7 +186,7 @@ function HomeComponent() {
         <div className="min-h-screen bg-[#0a0a0f] text-gray-100 font-sans p-4 md:p-8">
             <header className="max-w-6xl mx-auto mb-12 text-center">
                 <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-700 bg-clip-text text-transparent mb-4 tracking-tight">
-                    TFT SET 17 OPTIMIZER
+                    TFT SET 18 OPTIMIZER
                 </h1>
                 <p className="text-gray-400 text-lg max-w-2xl mx-auto">
                     Select your emblems and discover the most powerful board combinations.

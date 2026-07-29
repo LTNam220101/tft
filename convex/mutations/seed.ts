@@ -13,19 +13,19 @@ const BASE = `https://raw.communitydragon.org/${CDRAGON_PATCH}/plugins/rcp-be-lo
 const CDRAGON_TFT = `https://raw.communitydragon.org/${CDRAGON_PATCH}/cdragon/tft/en_us.json`
 
 /** Key in tftchampions-teamplanner.json (e.g. TFTSet17). */
-const SET_CHAMPIONS_KEY = 'TFTSet17' as const
+const SET_CHAMPIONS_KEY = 'TFTSet18' as const
 
 /** Champion path prefix in team planner JSON (e.g. Characters/TFT17_Ahri). */
-const CHAMPION_PATH_PREFIX = 'Characters/TFT17_'
+const CHAMPION_PATH_PREFIX = 'Characters/TFT18_'
 
 /** tfttraits.json `set` field for the active set. */
-const SET_TRAITS_FILTER = 'TFTSet17'
+const SET_TRAITS_FILTER = 'TFTSet18'
 
 /** Exclude team-up / revival traits if present. */
-const TEAMUP_TRAIT_ID_PREFIX = 'TFT17_Teamup_'
+const TEAMUP_TRAIT_ID_PREFIX = 'TFT18_Teamup_'
 
 /** tftitems nameId prefix for set-scoped items. */
-const ITEM_NAMEID_PREFIX = 'TFT17_'
+const ITEM_NAMEID_PREFIX = 'DA_18_'
 
 /**
  * Trait display names that count as "regions" for World Runes mode (`isRegion`) and UI.
@@ -146,9 +146,9 @@ export const seedFromApi = action({
 
     // Build lookup maps from cdragon data
     const cdragon = cdragonJson as { sets?: Record<string, { champions?: CdragonChampion[] }>; items?: CdragonItem[] }
-    const set17Champions: CdragonChampion[] = cdragon.sets?.['17']?.champions ?? []
+    const set18Champions: CdragonChampion[] = cdragon.sets?.['18']?.champions ?? []
     const champStatsMap = new Map<string, CdragonChampion['stats']>(
-      set17Champions.map((c) => [c.apiName, c.stats]),
+      set18Champions.map((c) => [c.apiName, c.stats]),
     )
     const itemEffectsMap = new Map<string, Record<string, number>>(
       (cdragon.items ?? [])
@@ -161,7 +161,7 @@ export const seedFromApi = action({
     ]
     if (!championSetRaw?.length) {
       throw new Error(
-        `No champions for ${SET_CHAMPIONS_KEY} at ${BASE}/tftchampions-teamplanner.json — adjust CDRAGON_PATCH or wait for Set 17 data.`,
+        `No champions for ${SET_CHAMPIONS_KEY} at ${BASE}/tftchampions-teamplanner.json — adjust CDRAGON_PATCH or wait for Set 18 data.`,
       )
     }
 
