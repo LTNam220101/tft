@@ -2,12 +2,12 @@ import { v } from 'convex/values'
 import { action } from './_generated/server'
 import { internal, api } from './_generated/api'
 import { ACTIVE_SET_KEY } from './gameConfig'
-import { scoreCoreTraitContribution, setSpecificTeamScoreDelta } from './optimizerSetBonuses'
+import {
+  scoreCoreTraitContribution,
+  setSpecificTeamScoreDelta,
+} from './optimizerSetBonuses'
 import {
   applyMissFortuneOptionalTraitToCounts,
-  // isMissFortuneChampion,
-  // nativeCountsWithMissFortuneVirtual,
-  // TFT17_MF_OPTIONAL_TRAITS,
   teamHasMissFortune,
 } from './optimizerMissFortune'
 
@@ -73,63 +73,29 @@ export const suggestTeams = action({
       emblemCounts[tk] = (emblemCounts[tk] || 0) + 1
     }
 
-    // Set 17 + Miss Fortune locked: 3 beam branches (one optional trait each).
-    // const lockedHasMissFortune = teamHasMissFortune(lockedInChamps)
-    let beam: any[]
-    // if (ACTIVE_SET_KEY === 'TFTSet17' && lockedHasMissFortune) {
-    //   beam = TFT17_MF_OPTIONAL_TRAITS.map((branch) => {
-    //     const keyBase = lockedInChamps
-    //       .map((c: any) => c.key!)
-    //       .sort()
-    //       .join(',')
-    //     return {
-    //       champions: lockedInChamps,
-    //       usedKeys: new Set(lockedInChamps.map((c: any) => c.key!)),
-    //       nativeCounts: getNativeCounts(lockedInChamps),
-    //       score: 0,
-    //       key: `${keyBase}|${branch}`,
-    //       mfBranch: branch,
-    //     }
-    //   })
-    //   for (const b of beam) {
-    //     b.score = calculateTeamScoreFromCounts(
-    //       b.nativeCounts,
-    //       lockedInChamps.length,
-    //       emblemCounts,
-    //       traitMap,
-    //       mode,
-    //       b.champions,
-    //       ACTIVE_SET_KEY,
-    //       teamSize,
-    //       b.mfBranch,
-    //     )
-    //   }
-    // } else {
-      beam = [
-        {
-          champions: lockedInChamps,
-          usedKeys: new Set(lockedInChamps.map((c: any) => c.key!)),
-          nativeCounts: getNativeCounts(lockedInChamps),
-          score: 0,
-          key: lockedInChamps
-            .map((c: any) => c.key!)
-            .sort()
-            .join(','),
-          mfBranch: null,
-        },
-      ]
-      beam[0].score = calculateTeamScoreFromCounts(
-        beam[0].nativeCounts,
-        lockedInChamps.length,
-        emblemCounts,
-        traitMap,
-        mode,
-        beam[0].champions,
-        ACTIVE_SET_KEY,
-        teamSize,
-        // null,
-      )
-    // }
+    let beam = [
+      {
+        champions: lockedInChamps,
+        usedKeys: new Set(lockedInChamps.map((c: any) => c.key!)),
+        nativeCounts: getNativeCounts(lockedInChamps),
+        score: 0,
+        key: lockedInChamps
+          .map((c: any) => c.key!)
+          .sort()
+          .join(','),
+        mfBranch: null,
+      },
+    ]
+    beam[0].score = calculateTeamScoreFromCounts(
+      beam[0].nativeCounts,
+      lockedInChamps.length,
+      emblemCounts,
+      traitMap,
+      mode,
+      beam[0].champions,
+      ACTIVE_SET_KEY,
+      teamSize,
+    )
 
     const beamWidth = 60
 
@@ -141,15 +107,7 @@ export const suggestTeams = action({
         for (const candidate of champions) {
           if (state.usedKeys.has(candidate.key!)) continue
 
-          const nativeForFilters =
-            // ACTIVE_SET_KEY === 'TFTSet17'
-            //   ? nativeCountsWithMissFortuneVirtual(
-            //       state.nativeCounts,
-            //       state.champions,
-            //       state.mfBranch ?? null,
-            //     )
-            //   : 
-              state.nativeCounts
+          const nativeForFilters = state.nativeCounts
 
           const hasSharedTrait = candidate.traits?.some(
             (t: any) =>
@@ -186,37 +144,6 @@ export const suggestTeams = action({
           ].sort()
           const teamKey = newTeamKeys.join(',')
 
-          // const stateHasMf = teamHasMissFortune(state.champions)
-          // const candIsMf = isMissFortuneChampion(candidate)
-
-          // if (ACTIVE_SET_KEY === 'TFTSet17' && candIsMf && !stateHasMf) {
-          //   for (const branch of TFT17_MF_OPTIONAL_TRAITS) {
-          //     const dedupeKey = `${teamKey}|${branch}`
-          //     if (seenKeys.has(dedupeKey)) continue
-          //     seenKeys.add(dedupeKey)
-          //     const score = calculateTeamScoreFromCounts(
-          //       newNativeCounts,
-          //       newTeam.length,
-          //       emblemCounts,
-          //       traitMap,
-          //       mode,
-          //       newTeam,
-          //       ACTIVE_SET_KEY,
-          //       teamSize,
-          //       branch,
-          //     )
-          //     nextCandidates.push({
-          //       champions: newTeam,
-          //       score,
-          //       usedKeys: new Set(newTeamKeys),
-          //       nativeCounts: newNativeCounts,
-          //       key: dedupeKey,
-          //       mfBranch: branch,
-          //     })
-          //   }
-          //   continue
-          // }
-
           const mfBranch: string | null = state.mfBranch ?? null
           const dedupeKey = `${teamKey}|${mfBranch ?? ''}`
           if (seenKeys.has(dedupeKey)) continue
@@ -231,7 +158,6 @@ export const suggestTeams = action({
             newTeam,
             ACTIVE_SET_KEY,
             teamSize,
-            // mfBranch,
           )
 
           nextCandidates.push({
@@ -266,9 +192,7 @@ export const suggestTeams = action({
         state.champions,
         state.mfBranch ?? null,
       ),
-      ...(state.mfBranch != null
-        ? { missFortuneBranch: state.mfBranch }
-        : {}),
+      ...(state.mfBranch != null ? { missFortuneBranch: state.mfBranch } : {}),
     }))
   },
 })
@@ -486,7 +410,6 @@ function calculateTeamScoreFromCounts(
   team: any[],
   setKey: string,
   targetTeamSize: number,
-  // mfOptionalTrait: string | null,
 ) {
   let rawTraitCounts: Record<string, number> = { ...nativeCounts }
 
@@ -496,14 +419,6 @@ function calculateTeamScoreFromCounts(
     const availableHolders = teamSize - native
     rawTraitCounts[traitId] = native + Math.min(count, availableHolders)
   }
-
-  // if (setKey === 'TFTSet17') {
-  //   rawTraitCounts = applyMissFortuneOptionalTraitToCounts(
-  //     rawTraitCounts,
-  //     team,
-  //     mfOptionalTrait,
-  //   )
-  // }
 
   let totalScore = scoreCoreTraitContribution(
     rawTraitCounts,
