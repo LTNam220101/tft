@@ -8,6 +8,7 @@ import {
 import * as React from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import appCss from '~/styles/app.css?url'
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // const PLATFORMS = [
 //   { value: "vn2", label: "VN" },
@@ -144,6 +145,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         {children}
         <Scripts />
       </body>
+      <SpeedInsights />
     </html>
   )
 }
