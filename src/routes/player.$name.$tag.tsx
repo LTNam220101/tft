@@ -9,6 +9,18 @@ export const Route = createFileRoute("/player/$name/$tag")({
     validateSearch: (search: Record<string, unknown>) => ({
         platform: (search.platform as string | undefined) ?? "vn2",
     }),
+    head: ({ params }) => {
+        const title = `${decodeURIComponent(params.name)}#${decodeURIComponent(params.tag)} — TFT Profile | T-Flex-T`
+        const description = `TFT match history, ranked stats, and top comps for ${decodeURIComponent(params.name)}#${decodeURIComponent(params.tag)}.`
+        return {
+            meta: [
+                { title },
+                { name: "description", content: description },
+                { property: "og:title", content: title },
+                { property: "og:description", content: description },
+            ],
+        }
+    },
     component: PlayerComponent,
 });
 

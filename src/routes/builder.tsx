@@ -7,7 +7,22 @@ import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
 import { getImageUrl } from "~/utils";
 import { buildTraitTooltipRows } from "../traitTooltip";
 
+const TITLE = "TFT Team Builder — T-Flex-T"
+const DESCRIPTION = "Build and simulate TFT team compositions on a hex board — place champions, equip items, and track active trait synergies in real time."
+
 export const Route = createFileRoute("/builder")({
+    head: () => ({
+        meta: [
+            { title: TITLE },
+            { name: "description", content: DESCRIPTION },
+            { property: "og:title", content: TITLE },
+            { property: "og:description", content: DESCRIPTION },
+            { property: "og:url", content: "https://tflext.gnoulman.com/builder" },
+        ],
+        links: [
+            { rel: "canonical", href: "https://tflext.gnoulman.com/builder" },
+        ],
+    }),
     component: BuilderComponent,
 });
 

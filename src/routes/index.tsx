@@ -7,7 +7,22 @@ import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
 import { buildTraitTooltipRows } from "../traitTooltip";
 import { getImageUrl } from "~/utils";
 
+const TITLE = "TFT Team Optimizer — T-Flex-T"
+const DESCRIPTION = "Suggest the best TFT team compositions from your chosen champions, emblems, and trait targets — an automated optimizer for TFT Set 17."
+
 export const Route = createFileRoute('/')({
+    head: () => ({
+        meta: [
+            { title: TITLE },
+            { name: "description", content: DESCRIPTION },
+            { property: "og:title", content: TITLE },
+            { property: "og:description", content: DESCRIPTION },
+            { property: "og:url", content: "https://tflext.gnoulman.com/" },
+        ],
+        links: [
+            { rel: "canonical", href: "https://tflext.gnoulman.com/" },
+        ],
+    }),
     component: HomeComponent,
 })
 

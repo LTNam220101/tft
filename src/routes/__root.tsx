@@ -21,6 +21,11 @@ import { SpeedInsights } from '@vercel/speed-insights/react';
 //   { value: "eun1", label: "EUNE" },
 // ] as const;
 
+const SITE_URL = 'https://tflext.gnoulman.com'
+const SITE_NAME = 'T-Flex-T'
+const DEFAULT_DESCRIPTION = 'TFT team composition optimizer and builder for TFT Set 17 — find the best trait synergies, build your own comp, and analyze your match history.'
+const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`
+
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
 }>()({
@@ -34,11 +39,36 @@ export const Route = createRootRouteWithContext<{
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'T-Flex-T',
+        title: SITE_NAME,
       },
+      {
+        name: 'description',
+        content: DEFAULT_DESCRIPTION,
+      },
+      {
+        name: 'robots',
+        content: 'index, follow',
+      },
+      {
+        name: 'theme-color',
+        content: '#07070c',
+      },
+      // Open Graph
+      { property: 'og:type', content: 'website' },
+      { property: 'og:site_name', content: SITE_NAME },
+      { property: 'og:title', content: SITE_NAME },
+      { property: 'og:description', content: DEFAULT_DESCRIPTION },
+      { property: 'og:image', content: DEFAULT_OG_IMAGE },
+      { property: 'og:url', content: SITE_URL },
+      // Twitter
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: SITE_NAME },
+      { name: 'twitter:description', content: DEFAULT_DESCRIPTION },
+      { name: 'twitter:image', content: DEFAULT_OG_IMAGE },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
+      { rel: 'canonical', href: SITE_URL },
       {
         rel: 'apple-touch-icon',
         sizes: '180x180',
@@ -58,6 +88,18 @@ export const Route = createRootRouteWithContext<{
       },
       { rel: 'manifest', href: '/site.webmanifest', color: '#fffff' },
       { rel: 'icon', href: '/favicon.ico' },
+    ],
+    scripts: [
+      {
+        type: 'application/ld+json',
+        children: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: SITE_NAME,
+          url: SITE_URL,
+          description: DEFAULT_DESCRIPTION,
+        }),
+      },
     ],
   }),
   notFoundComponent: () => <div>Route not found</div>,
