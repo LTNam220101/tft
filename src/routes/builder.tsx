@@ -1,9 +1,11 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
 import { getImageUrl } from "~/utils";
+import { buildTraitTooltipRows } from "../traitTooltip";
 
 export const Route = createFileRoute("/builder")({
     component: BuilderComponent,
@@ -85,7 +87,13 @@ function computeTraits(
 }
 
 // ── TraitRow ──────────────────────────────────────────────────────────────────
-function TraitRow({ t }: { t: ActiveTrait }) {
+function TraitRow({ t, isFiltered, onHoverStart, onHoverEnd, onClick }: {
+    t: ActiveTrait;
+    isFiltered: boolean;
+    onHoverStart: (t: ActiveTrait, anchorRect: DOMRect) => void;
+    onHoverEnd: () => void;
+    onClick: (t: ActiveTrait) => void;
+}) {
     const isMax = t.tier === t.totalTiers;
     const isActive = t.tier > 0;
     const cls = isMax || t.unique
@@ -93,7 +101,12 @@ function TraitRow({ t }: { t: ActiveTrait }) {
         : isActive ? "bg-white/5 border-white/10 text-gray-200"
         : "bg-transparent border-transparent text-gray-500";
     return (
-        <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border text-xs ${cls}`}>
+        <div
+            className={`flex items-center gap-2 px-2 py-1 rounded-lg border text-xs cursor-pointer transition-all ${cls} ${isFiltered ? "ring-2 ring-amber-300" : ""}`}
+            onMouseEnter={e => onHoverStart(t, e.currentTarget.getBoundingClientRect())}
+            onMouseLeave={onHoverEnd}
+            onClick={() => onClick(t)}
+        >
             <img
                 src={getImageUrl(t.iconPath)} alt={t.name}
                 className={`w-4 h-4 object-contain shrink-0 ${isMax || t.unique ? "" : isActive ? "brightness-110" : "grayscale brightness-50"}`}
@@ -111,6 +124,52 @@ function TraitRow({ t }: { t: ActiveTrait }) {
             </div>
         </div>
     );
+}
+
+// ── TraitTooltipPortal ──────────────────────────────────────────────────────────
+/** Renders in `document.body` with fixed coords — always on top of surrounding stacking contexts. */
+function TraitTooltipPortal({ t, anchorRect }: { t: ActiveTrait; anchorRect: DOMRect }) {
+    const rows = buildTraitTooltipRows(t.description, t.effects, t.count, t.innateConstants);
+
+    const style: CSSProperties = {
+        position: "fixed",
+        left: anchorRect.right + 8,
+        top: anchorRect.top,
+        zIndex: 2147483647,
+    };
+
+    const panel = (
+        <div
+            className="pointer-events-none w-[min(22rem,calc(100vw-2rem))] max-h-[min(50vh,22rem)] overflow-y-auto overscroll-contain rounded-xl border border-amber-500/30 bg-[#07070c]/98 p-3 text-left text-[11px] leading-snug text-gray-200 shadow-2xl ring-1 ring-white/10 backdrop-blur-md"
+            role="tooltip"
+            style={style}
+        >
+            <div className="mb-2 border-b border-white/10 pb-2 font-bold text-amber-300">
+                {t.name}{" "}
+                <span className="font-mono text-[10px] font-normal text-gray-500">({t.count})</span>
+            </div>
+            {rows.length === 0 ? (
+                <p className="text-gray-500">Chưa có mô tả trait (seed lại hoặc chạy optimize sau khi cập nhật DB).</p>
+            ) : (
+                <ul className="space-y-2">
+                    {rows.map((r, i) => (
+                        <li
+                            key={i}
+                            className={
+                                r.active
+                                    ? "text-gray-50 font-medium [text-shadow:0_0_14px_rgba(251,191,36,0.2)]"
+                                    : "text-gray-500 text-[10px] leading-relaxed"
+                            }
+                            dangerouslySetInnerHTML={{ __html: r.html }}
+                        />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+
+    if (typeof document === "undefined") return null;
+    return createPortal(panel, document.body);
 }
 
 // ── HexSlot ───────────────────────────────────────────────────────────────────
@@ -443,11 +502,24 @@ function BuilderComponent() {
     const [champItems, setChampItems] = useState<Record<string, string[]>>({});
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [champStars, setChampStars] = useState<Record<string, 1 | 2 | 3>>({});
+    const [traitTooltip, setTraitTooltip] = useState<{ t: ActiveTrait; anchorRect: DOMRect } | null>(null);
+
+    useEffect(() => {
+        if (!traitTooltip) return;
+        const clear = () => setTraitTooltip(null);
+        window.addEventListener("scroll", clear, true);
+        window.addEventListener("resize", clear);
+        return () => {
+            window.removeEventListener("scroll", clear, true);
+            window.removeEventListener("resize", clear);
+        };
+    }, [traitTooltip]);
 
     // ── Units picker ─────────────────────────────────────────────────────────
     const [champSearch, setChampSearch]     = useState("");
     const [costFilter, setCostFilter]       = useState<number | null>(null);
     const [traitFilter, setTraitFilter]     = useState<string | null>(null);
+    const [traitDropdownOpen, setTraitDropdownOpen] = useState(false);
 
     // ── Items picker ─────────────────────────────────────────────────────────
     const [itemSearch, setItemSearch]           = useState("");
@@ -481,6 +553,7 @@ function BuilderComponent() {
         () => [...allTraits].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
         [allTraits],
     );
+    const selectedTrait = traitFilter ? traitByKey.get(traitFilter) : null;
 
     const pickerChamps = useMemo(() => {
         let list = allChampions;
@@ -709,7 +782,15 @@ function BuilderComponent() {
                             <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Traits</h2>
                             {activeTraits.length === 0
                                 ? <p className="text-xs text-gray-700 italic text-center py-4">Place champions</p>
-                                : <div className="space-y-1">{activeTraits.map(t => <TraitRow key={t.key} t={t} />)}</div>
+                                : <div className="space-y-1">{activeTraits.map(t => (
+                                    <TraitRow
+                                        key={t.key} t={t}
+                                        isFiltered={traitFilter === t.key}
+                                        onClick={t => setTraitFilter(p => p === t.key ? null : t.key)}
+                                        onHoverStart={(t, anchorRect) => setTraitTooltip({ t, anchorRect })}
+                                        onHoverEnd={() => setTraitTooltip(null)}
+                                    />
+                                ))}</div>
                             }
                         </div>
                     </div>
@@ -904,16 +985,43 @@ function BuilderComponent() {
                                     onChange={e => setChampSearch(e.target.value)}
                                     className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-white/30"
                                 />
-                                <select
-                                    value={traitFilter ?? ""}
-                                    onChange={e => setTraitFilter(e.target.value || null)}
-                                    className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] font-bold text-gray-200 focus:outline-none focus:border-white/30"
-                                >
-                                    <option value="">All traits</option>
-                                    {sortedTraits.map(t => (
-                                        <option key={t.key} value={t.key}>{t.name}</option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTraitDropdownOpen(o => !o)}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${traitFilter ? "bg-white/15 border-white/30 text-white" : "border-white/5 text-gray-500 hover:text-gray-300"}`}
+                                    >
+                                        {selectedTrait?.iconPath && (
+                                            <img src={getImageUrl(selectedTrait.iconPath)} alt="" className="w-3 h-3 object-contain" />
+                                        )}
+                                        <span>{selectedTrait?.name ?? "All traits"}</span>
+                                    </button>
+                                    {traitDropdownOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-10" onClick={() => setTraitDropdownOpen(false)} />
+                                            <div className="absolute right-0 top-full mt-1 z-20 w-40 max-h-60 overflow-y-auto custom-scrollbar bg-[#1c1c26] border border-white/10 rounded-lg shadow-xl py-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setTraitFilter(null); setTraitDropdownOpen(false); }}
+                                                    className={`w-full flex items-center gap-2 px-2 py-1 text-left text-[11px] font-semibold ${traitFilter === null ? "text-white bg-white/10" : "text-gray-400 hover:bg-white/5"}`}
+                                                >
+                                                    All traits
+                                                </button>
+                                                {sortedTraits.map(t => (
+                                                    <button
+                                                        key={t.key}
+                                                        type="button"
+                                                        onClick={() => { setTraitFilter(t.key!); setTraitDropdownOpen(false); }}
+                                                        className={`w-full flex items-center gap-2 px-2 py-1 text-left text-[11px] font-semibold ${traitFilter === t.key ? "text-white bg-white/10" : "text-gray-400 hover:bg-white/5"}`}
+                                                    >
+                                                        {t.iconPath && <img src={getImageUrl(t.iconPath)} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                                                        <span className="truncate">{t.name}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                                 <button onClick={() => setCostFilter(null)} className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${costFilter === null ? "bg-white/15 border-white/30 text-white" : "border-white/5 text-gray-500 hover:text-gray-300"}`}>ALL</button>
                                 {[1,2,3,4,5].map(c => (
                                     <button key={c} onClick={() => setCostFilter(p => p === c ? null : c)}
@@ -977,6 +1085,13 @@ function BuilderComponent() {
                 </div>
 
             </div>
+            {traitTooltip && (
+                <TraitTooltipPortal
+                    key={`tt-${traitTooltip.t.key}`}
+                    t={traitTooltip.t}
+                    anchorRect={traitTooltip.anchorRect}
+                />
+            )}
         </div>
     );
 }
