@@ -447,6 +447,7 @@ function BuilderComponent() {
     // ── Units picker ─────────────────────────────────────────────────────────
     const [champSearch, setChampSearch]     = useState("");
     const [costFilter, setCostFilter]       = useState<number | null>(null);
+    const [traitFilter, setTraitFilter]     = useState<string | null>(null);
 
     // ── Items picker ─────────────────────────────────────────────────────────
     const [itemSearch, setItemSearch]           = useState("");
@@ -476,15 +477,21 @@ function BuilderComponent() {
         [slots, champByKey, traitByKey, champItems, itemsByKey, traitByName],
     );
 
+    const sortedTraits = useMemo(
+        () => [...allTraits].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
+        [allTraits],
+    );
+
     const pickerChamps = useMemo(() => {
         let list = allChampions;
         if (costFilter !== null) list = list.filter(c => c.cost === costFilter);
+        if (traitFilter !== null) list = list.filter(c => c.traits?.some((t: any) => t.id === traitFilter));
         if (champSearch.trim()) {
             const q = champSearch.toLowerCase();
             list = list.filter(c => c.name?.toLowerCase().includes(q));
         }
         return list;
-    }, [allChampions, costFilter, champSearch]);
+    }, [allChampions, costFilter, traitFilter, champSearch]);
 
     const pickerItems = useMemo(() => {
         let list = allItems;
@@ -897,6 +904,16 @@ function BuilderComponent() {
                                     onChange={e => setChampSearch(e.target.value)}
                                     className="w-28 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-white/30"
                                 />
+                                <select
+                                    value={traitFilter ?? ""}
+                                    onChange={e => setTraitFilter(e.target.value || null)}
+                                    className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] font-bold text-gray-200 focus:outline-none focus:border-white/30"
+                                >
+                                    <option value="">All traits</option>
+                                    {sortedTraits.map(t => (
+                                        <option key={t.key} value={t.key}>{t.name}</option>
+                                    ))}
+                                </select>
                                 <button onClick={() => setCostFilter(null)} className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${costFilter === null ? "bg-white/15 border-white/30 text-white" : "border-white/5 text-gray-500 hover:text-gray-300"}`}>ALL</button>
                                 {[1,2,3,4,5].map(c => (
                                     <button key={c} onClick={() => setCostFilter(p => p === c ? null : c)}
