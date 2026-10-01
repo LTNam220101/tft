@@ -1,21 +1,31 @@
+import type { CompositionBalance } from './optimizerRoles'
 import { v } from 'convex/values'
 import { action } from './_generated/server'
-import { internal, api } from './_generated/api'
+import { api, internal } from './_generated/api'
 import { ACTIVE_SET_KEY } from './gameConfig'
-import {
-  scoreCoreTraitContribution,
-  setSpecificTeamScoreDelta,
-} from './optimizerSetBonuses'
 import {
   applyMissFortuneOptionalTraitToCounts,
   teamHasMissFortune,
 } from './optimizerMissFortune'
+import {
+  countActiveDefensiveTraits,
+  evaluateTeamCompositionBalance,
+  getChampionRole,
+  getChampionSlotCost,
+  getTeamTotalSlots,
+  getChampionTraitAmount,
+} from './optimizerRoles'
+import {
+  scoreCoreTraitContribution,
+  setSpecificTeamScoreDelta,
+} from './optimizerSetBonuses'
 
 /** Minimum distinct active region traits for `suggestWorldRunes` (tune per set if the mode rules change). */
 const WORLD_RUNE_MIN_ACTIVE_REGIONS = 4
 
 export const suggestTeams = action({
   args: {
+    traitLadder: v.optional(v.boolean()),
     emblemIds: v.array(v.string()), // IDs or Keys of emblems
     teamSize: v.number(),
     mode: v.optional(v.union(v.literal('wide'), v.literal('deep'))),
@@ -56,6 +66,8 @@ export const suggestTeams = action({
     const lockedInChamps = allChampions.filter((c: any) =>
       mustHaveChampIds.includes(c._id),
     )
+    const initialSlots = getTeamTotalSlots(lockedInChamps)
+    const targetSlots = Math.max(teamSize, initialSlots)
 
     // Map each emblem ID to its corresponding trait key
     const emblemTraitKeys = emblemIds
@@ -73,7 +85,16 @@ export const suggestTeams = action({
       emblemCounts[tk] = (emblemCounts[tk] || 0) + 1
     }
 
-    let beam = [
+    let beam: Array<{
+      champions: Array<any>
+      usedKeys: Set<string>
+      nativeCounts: Record<string, number>
+      score: number
+      key: string
+      mfBranch: string | null
+      balance: CompositionBalance
+      slots: number
+    }> = [
       {
         champions: lockedInChamps,
         usedKeys: new Set(lockedInChamps.map((c: any) => c.key!)),
@@ -84,28 +105,69 @@ export const suggestTeams = action({
           .sort()
           .join(','),
         mfBranch: null,
+        balance: {
+          scoreDelta: 0,
+          tankCount: 0,
+          bruiserCount: 0,
+          frontlineCount: 0,
+          frontlineScore: 0,
+          carryCount: 0,
+          supportCount: 0,
+          status: 'balanced',
+        },
+        slots: initialSlots,
       },
     ]
-    beam[0].score = calculateTeamScoreFromCounts(
+
+    const initialScoreObj = calculateTeamScoreFromCounts(
       beam[0].nativeCounts,
-      lockedInChamps.length,
+      beam[0].slots,
       emblemCounts,
       traitMap,
       mode,
       beam[0].champions,
       ACTIVE_SET_KEY,
-      teamSize,
+      targetSlots,
     )
+    beam[0].score = initialScoreObj.score
+    beam[0].balance = initialScoreObj.balance
 
     const beamWidth = 60
+    const maxSteps = Math.max(0, targetSlots - initialSlots)
 
-    for (let step = lockedInChamps.length; step < teamSize; step++) {
-      const nextCandidates: any[] = []
+    for (let step = 0; step < maxSteps; step++) {
+      if (beam.every((state) => state.slots >= targetSlots)) {
+        break
+      }
+
+      const nextCandidates: Array<{
+        champions: Array<any>
+        score: number
+        usedKeys: Set<string>
+        nativeCounts: Record<string, number>
+        key: string
+        mfBranch: string | null
+        balance: CompositionBalance
+        slots: number
+      }> = []
       const seenKeys = new Set<string>()
 
       for (const state of beam) {
+        if (state.slots >= targetSlots) {
+          if (!seenKeys.has(state.key)) {
+            seenKeys.add(state.key)
+            nextCandidates.push(state)
+          }
+          continue
+        }
+
+        const remainingSlots = targetSlots - state.slots
+
         for (const candidate of champions) {
           if (state.usedKeys.has(candidate.key!)) continue
+
+          const candidateSlots = getChampionSlotCost(candidate)
+          if (candidateSlots > remainingSlots) continue
 
           const nativeForFilters = state.nativeCounts
 
@@ -125,7 +187,7 @@ export const suggestTeams = action({
               nativeForFilters,
               emblemCounts,
               traitMap,
-              teamSize,
+              targetSlots,
             )
             if (!hasSharedTrait && !isComplete) continue
           }
@@ -133,7 +195,8 @@ export const suggestTeams = action({
           const newNativeCounts = { ...state.nativeCounts }
           if (candidate.traits) {
             for (const t of candidate.traits) {
-              newNativeCounts[t.id] = (newNativeCounts[t.id] || 0) + 1
+              const amount = getChampionTraitAmount(candidate, t)
+              newNativeCounts[t.id] = (newNativeCounts[t.id] || 0) + amount
             }
           }
 
@@ -149,15 +212,17 @@ export const suggestTeams = action({
           if (seenKeys.has(dedupeKey)) continue
           seenKeys.add(dedupeKey)
 
-          const score = calculateTeamScoreFromCounts(
+          const newSlots = state.slots + candidateSlots
+
+          const { score, balance } = calculateTeamScoreFromCounts(
             newNativeCounts,
-            newTeam.length,
+            newSlots,
             emblemCounts,
             traitMap,
             mode,
             newTeam,
             ACTIVE_SET_KEY,
-            teamSize,
+            targetSlots,
           )
 
           nextCandidates.push({
@@ -167,9 +232,13 @@ export const suggestTeams = action({
             nativeCounts: newNativeCounts,
             key: dedupeKey,
             mfBranch,
+            balance,
+            slots: newSlots,
           })
         }
       }
+
+      if (nextCandidates.length === 0) break
 
       // Prune beam
       beam = nextCandidates
@@ -180,12 +249,21 @@ export const suggestTeams = action({
         .slice(0, beamWidth)
     }
 
-    return beam.map((state: any) => ({
-      champions: state.champions,
+    const fullStates = beam.filter((state) => state.slots >= targetSlots)
+    const finalBeam = fullStates.length > 0 ? fullStates : beam
+
+    return finalBeam.map((state) => ({
+      champions: state.champions.map((champ: any) => ({
+        ...champ,
+        role: getChampionRole(champ),
+        slotCost: getChampionSlotCost(champ),
+      })),
       score: state.score,
+      balance: state.balance,
+      slots: state.slots,
       activeTraits: getActiveTraitsFromCounts(
         state.nativeCounts,
-        state.champions.length,
+        state.slots,
         emblemCounts,
         traitMap,
         ACTIVE_SET_KEY,
@@ -299,7 +377,8 @@ export const suggestWorldRunes = action({
             const newNativeCounts = { ...state.nativeCounts }
             if (candidate.traits) {
               for (const t of candidate.traits) {
-                newNativeCounts[t.id] = (newNativeCounts[t.id] || 0) + 1
+                const amount = getChampionTraitAmount(candidate, t)
+                newNativeCounts[t.id] = (newNativeCounts[t.id] || 0) + amount
               }
             }
 
@@ -389,7 +468,8 @@ function getNativeCounts(team: any[]) {
   for (const c of team) {
     if (c.traits) {
       for (const t of c.traits) {
-        nativeCounts[t.id] = (nativeCounts[t.id] || 0) + 1
+        const amount = getChampionTraitAmount(c, t)
+        nativeCounts[t.id] = (nativeCounts[t.id] || 0) + amount
       }
     }
   }
@@ -407,10 +487,10 @@ function calculateTeamScoreFromCounts(
   emblemCounts: Record<string, number>,
   traitMap: Map<string, any>,
   mode: 'wide' | 'deep',
-  team: any[],
+  team: Array<any>,
   setKey: string,
   targetTeamSize: number,
-) {
+): { score: number; balance: CompositionBalance } {
   let rawTraitCounts: Record<string, number> = { ...nativeCounts }
 
   // Add emblems
@@ -436,22 +516,36 @@ function calculateTeamScoreFromCounts(
 
   // Cost Penalty
   for (const c of team) {
-    totalScore += c.cost
+    totalScore += c.cost * c.cost
   }
 
   // Cost-tier penalty only when optimizing *for* that final board size (not at intermediate beam steps).
   if (targetTeamSize === 7) {
     for (const c of team) {
       const cost = c.cost ?? 0
-      if (cost === 5) totalScore -= 10
-      else if (cost === 4) totalScore -= 5
+      if (cost === 5) totalScore -= 25
+      else if (cost === 4) totalScore -= 16
     }
   } else if (targetTeamSize === 8) {
     for (const c of team) {
-      if ((c.cost ?? 0) === 5) totalScore -= 5
+      if ((c.cost ?? 0) === 5) totalScore -= 25
     }
   }
-  return totalScore
+
+  // Tactical board composition evaluation: tank/frontline vs carry/backline balance
+  const activeDefensiveTraitsCount = countActiveDefensiveTraits(
+    rawTraitCounts,
+    traitMap,
+  )
+  const balance = evaluateTeamCompositionBalance(
+    team,
+    teamSize,
+    targetTeamSize,
+    activeDefensiveTraitsCount,
+  )
+  totalScore += balance.scoreDelta
+
+  return { score: totalScore, balance }
 }
 
 function calculateRegionScoreFromCounts(

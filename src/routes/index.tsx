@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { createFileRoute } from '@tanstack/react-router'
 import { useAction, useQuery } from "convex/react";
@@ -129,6 +129,14 @@ function HomeComponent() {
 
     const traitIdsForChampion = (champ: any): string[] =>
         (champ.traits ?? []).map((t: { id: string }) => t.id);
+
+    const selectedChampSlots = useMemo(() => {
+        return selectedChampIds.reduce((sum, id) => {
+            const champ = allChampions.find(c => c._id === id);
+            const isElder = champ?.key === 'DA_18_ElderDragon' || champ?.name?.toLowerCase().includes('elder dragon');
+            return sum + (isElder ? 2 : 1);
+        }, 0);
+    }, [selectedChampIds, allChampions]);
 
     // Derived: filter emblems based on mode
     const emblems = items.filter(i => {
@@ -338,7 +346,7 @@ function HomeComponent() {
                                 )}
                             </div>
                             <p className="text-xs text-gray-400 mb-4 px-1 leading-relaxed">
-                                Forced include: {selectedChampIds.length} / {teamSize}. These units will be prioritized in the search.
+                                Forced include: {selectedChampIds.length} units ({selectedChampSlots} / {teamSize} slots). These units will be prioritized in the search.
                             </p>
 
                             <div className="flex flex-wrap gap-1 mb-4">
@@ -509,10 +517,41 @@ function HomeComponent() {
                             >
                                 <div className="p-6">
                                     <div className="flex justify-between items-center mb-6">
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-3 flex-wrap">
                                             <span className="text-gray-500 font-mono text-sm uppercase tracking-widest">Board #{idx + 1}</span>
                                             <span className="h-4 w-[1px] bg-white/10"></span>
                                             <span className="text-amber-400 font-bold tracking-tight">POWER: {Math.round(team.score)}</span>
+                                            <span className="h-4 w-[1px] bg-white/10 hidden sm:inline-block"></span>
+                                            <span className="text-xs px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300 font-mono" title="Tổng số slot tướng đã dùng / Kích thước đội hình">
+                                                {team.slots ?? team.champions.reduce((s: number, c: any) => s + (c.slotCost ?? (c.key === 'DA_18_ElderDragon' ? 2 : 1)), 0)}/{teamSize} Slots
+                                            </span>
+                                            {team.balance && (
+                                                <>
+                                                    <span className="h-4 w-[1px] bg-white/10 hidden sm:inline-block"></span>
+                                                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                                        <span
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                            title="Tướng chống chịu hàng trước (Tank / Đấu sĩ)"
+                                                        >
+                                                            🛡️ {team.balance.frontlineCount} Tank
+                                                        </span>
+                                                        <span
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                                            title="Tướng sát thương chủ lực (Carry)"
+                                                        >
+                                                            ⚔️ {team.balance.carryCount} Carry
+                                                        </span>
+                                                        {team.balance.supportCount > 0 && (
+                                                            <span
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                                                title="Tướng hỗ trợ / Đa dụng (Support)"
+                                                            >
+                                                                ✨ {team.balance.supportCount} SP
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                         <div className="flex -space-x-2">
                                             {team.activeTraits.map((t: any) => {
@@ -576,6 +615,44 @@ function HomeComponent() {
                                                             alt={champ.name}
                                                             className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all"
                                                         />
+                                                        {champ.role && (
+                                                            <div
+                                                                className={`absolute top-1 left-1 px-1 rounded text-[8px] sm:text-[9px] font-bold backdrop-blur-md shadow-md ${
+                                                                    champ.role === 'tank'
+                                                                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
+                                                                        : champ.role === 'bruiser'
+                                                                        ? 'bg-teal-950/80 text-teal-300 border border-teal-500/30'
+                                                                        : champ.role === 'support'
+                                                                        ? 'bg-blue-950/80 text-blue-300 border border-blue-500/30'
+                                                                        : 'bg-rose-950/80 text-rose-300 border border-rose-500/30'
+                                                                }`}
+                                                                title={
+                                                                    champ.role === 'tank'
+                                                                        ? 'Chống chịu (Tank)'
+                                                                        : champ.role === 'bruiser'
+                                                                        ? 'Đấu sĩ (Bruiser)'
+                                                                        : champ.role === 'support'
+                                                                        ? 'Hỗ trợ (Support)'
+                                                                        : 'Chủ lực (Carry)'
+                                                                }
+                                                            >
+                                                                {champ.role === 'tank'
+                                                                    ? '🛡️'
+                                                                    : champ.role === 'bruiser'
+                                                                    ? '🪓'
+                                                                    : champ.role === 'support'
+                                                                    ? '✨'
+                                                                    : '⚔️'}
+                                                            </div>
+                                                        )}
+                                                        {((champ.slotCost ?? 1) === 2 || champ.key === 'DA_18_ElderDragon' || champ.name?.toLowerCase().includes('elder dragon')) && (
+                                                            <div
+                                                                className="absolute top-1 right-1 px-1 rounded text-[8px] sm:text-[9px] font-bold backdrop-blur-md shadow-md bg-amber-950/80 text-amber-300 border border-amber-500/40"
+                                                                title="Chiếm 2 slot trên bàn cờ"
+                                                            >
+                                                                2👥
+                                                            </div>
+                                                        )}
                                                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm text-[8px] sm:text-[10px] text-center font-bold py-0.5 uppercase truncate px-1 pointer-events-none">
                                                             {champ.name}
                                                         </div>

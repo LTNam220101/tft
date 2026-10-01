@@ -20,7 +20,7 @@ export function scoreCoreTraitContribution(
         if (activeEffects.length > 0) {
             if (mode === "wide") {
                 if (traitDef.unique) {
-                    totalScore += 1;
+                    totalScore += 5;
                 } else {
                     totalScore += 5;
                 }

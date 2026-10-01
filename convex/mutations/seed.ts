@@ -2,6 +2,7 @@ import { v } from 'convex/values'
 import { action, internalMutation } from '../_generated/server'
 import { internal } from '../_generated/api'
 import { champion, item, trait } from '../schema'
+import { determineChampionRole } from '../optimizerRoles'
 
 /**
  * Community Dragon patch folder (e.g. 17.1). Change when the client ships Set 17 data.
@@ -15,8 +16,8 @@ const CDRAGON_TFT = `https://raw.communitydragon.org/${CDRAGON_PATCH}/cdragon/tf
 /** Key in tftchampions-teamplanner.json (e.g. TFTSet17). */
 const SET_CHAMPIONS_KEY = 'TFTSet18' as const
 
-/** Champion path prefix in team planner JSON (e.g. Characters/TFT17_Ahri). */
-const CHAMPION_PATH_PREFIX = 'Characters/TFT18_'
+/** Champion path prefixes in team planner JSON (e.g. Characters/DA_ or Characters/TFT18_). */
+const CHAMPION_PATH_PREFIXES = ['Characters/DA_', 'Characters/TFT18_'] as const
 
 /** tfttraits.json `set` field for the active set. */
 const SET_TRAITS_FILTER = 'TFTSet18'
@@ -100,6 +101,14 @@ interface RawItem {
 
 interface CdragonChampion {
   apiName: string
+  characterName?: string
+  name?: string
+  role?: string | null
+  ability?: {
+    desc?: string
+    name?: string
+    variables?: Array<{ name: string; value: number[] }>
+  }
   stats?: {
     hp?: number
     damage?: number
@@ -145,11 +154,20 @@ export const seedFromApi = action({
     ])
 
     // Build lookup maps from cdragon data
-    const cdragon = cdragonJson as { sets?: Record<string, { champions?: CdragonChampion[] }>; items?: CdragonItem[] }
-    const set18Champions: CdragonChampion[] = cdragon.sets?.['18']?.champions ?? []
-    const champStatsMap = new Map<string, CdragonChampion['stats']>(
-      set18Champions.map((c) => [c.apiName, c.stats]),
-    )
+    const cdragon = cdragonJson as {
+      sets?: Record<string, { champions?: CdragonChampion[] }>
+      setData?: Array<{ mutator?: string; number?: number; champions?: CdragonChampion[] }>
+      items?: CdragonItem[]
+    }
+    const set18Champions: CdragonChampion[] =
+      cdragon.sets?.['18']?.champions ??
+      cdragon.setData?.find((s) => s.mutator === 'TFTSet18' || s.number === 18)?.champions ??
+      []
+    const cdragonChampMap = new Map<string, CdragonChampion>()
+    for (const c of set18Champions) {
+      if (c.apiName) cdragonChampMap.set(c.apiName, c)
+      if (c.characterName) cdragonChampMap.set(c.characterName, c)
+    }
     const itemEffectsMap = new Map<string, Record<string, number>>(
       (cdragon.items ?? [])
         .filter((i) => i.effects != null)
@@ -166,20 +184,30 @@ export const seedFromApi = action({
     }
 
     const champions = championSetRaw
-      .filter((c) => c.path?.startsWith(CHAMPION_PATH_PREFIX))
-      .map((c) => ({
-        key: c.character_id,
-        name: c.display_name,
-        cost: c.tier,
-        traits: c.traits || [],
-        iconPath: c.squareIconPath,
-        path: c.path,
-        stats: stripNulls(champStatsMap.get(c.character_id)),
-      }))
+      .filter((c) => CHAMPION_PATH_PREFIXES.some((p) => c.path?.startsWith(p)))
+      .map((c) => {
+        const cd = cdragonChampMap.get(c.character_id)
+        const traits = (c.traits || []).map((t) => t.name)
+        const range = cd?.stats?.range ?? 1
+        const desc = cd?.ability?.desc ?? ''
+        const role = determineChampionRole(c.display_name, cd?.role, desc, range, traits)
+
+        return {
+          key: c.character_id,
+          name: c.display_name,
+          cost: c.tier,
+          role,
+          rawRole: cd?.role ?? undefined,
+          traits: c.traits || [],
+          iconPath: c.squareIconPath,
+          path: c.path,
+          stats: stripNulls(cd?.stats),
+        }
+      })
 
     if (champions.length === 0) {
       throw new Error(
-        `No champions left after ${CHAMPION_PATH_PREFIX} filter — check CHAMPION_PATH_PREFIX matches client data.`,
+        `No champions left after prefix filter — check CHAMPION_PATH_PREFIXES matches client data.`,
       )
     }
 

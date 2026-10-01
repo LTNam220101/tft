@@ -76,8 +76,13 @@ function computeTraits(
     const counts: Record<string, number> = {};
     for (const key of slots) {
         if (!key) continue;
-        for (const t of champByKey.get(key)?.traits ?? []) {
-            counts[t.id] = (counts[t.id] || 0) + 1;
+        const champ = champByKey.get(key);
+        for (const t of champ?.traits ?? []) {
+            const isElderRiftbeast =
+                (key === 'DA_18_ElderDragon' || champ?.name?.toLowerCase().includes('elder dragon')) &&
+                (t.id === 'DA_Riftbeast18' || t.name?.toLowerCase().includes('riftbeast'));
+            const amount = isElderRiftbeast ? 2 : (t.amount ?? 1);
+            counts[t.id] = (counts[t.id] || 0) + amount;
         }
         for (const itemKey of champItems[key] ?? []) {
             const traitKey = getEmblemTraitKey(itemsByKey.get(itemKey), traitByName);
@@ -322,6 +327,14 @@ function ChampCard({
                         <span className="text-white text-xs font-black drop-shadow">✓</span>
                     </div>
                 )}
+                {(champ.key === 'DA_18_ElderDragon' || champ.name?.toLowerCase().includes('elder dragon')) && (
+                    <div
+                        className="absolute top-0 right-0 px-1 rounded-bl text-[7px] font-bold bg-amber-950/90 text-amber-300 border-l border-b border-amber-500/40"
+                        title="Chiếm 2 slot trên bàn cờ"
+                    >
+                        2👥
+                    </div>
+                )}
             </div>
             <span className="text-[8px] text-gray-500 group-hover:text-gray-300 transition-colors w-12 text-center truncate">{champ.name}</span>
         </div>
@@ -552,7 +565,14 @@ function BuilderComponent() {
     const [dragKind, setDragKind]           = useState<"champion" | "item" | null>(null);
 
     // ── Derived ──────────────────────────────────────────────────────────────
-    const boardCount    = useMemo(() => slots.filter(Boolean).length, [slots]);
+    const boardCount = useMemo(() => {
+        return slots.reduce((acc, key) => {
+            if (!key) return acc;
+            const champ = champByKey.get(key);
+            const isElder = key === 'DA_18_ElderDragon' || champ?.name?.toLowerCase().includes('elder dragon');
+            return acc + (isElder ? 2 : 1);
+        }, 0);
+    }, [slots, champByKey]);
     const boardChampKeys = useMemo(() => new Set(slots.filter(Boolean) as string[]), [slots]);
 
     const selectedChamp = selectedKey ? champByKey.get(selectedKey) ?? null : null;

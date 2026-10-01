@@ -17,6 +17,8 @@ export const champion = v.object({
   iconPath: v.optional(v.string()),
   path: v.optional(v.string()), // e.g. Characters/TFT17_Ahri
   isLocked: v.optional(v.boolean()),
+  role: v.optional(v.union(v.literal('tank'), v.literal('bruiser'), v.literal('carry'), v.literal('support'))),
+  rawRole: v.optional(v.string()),
   /** Base stats at 1-star, sourced from cdragon/tft/en_us.json */
   stats: v.optional(v.object({
     hp: v.optional(v.number()),
