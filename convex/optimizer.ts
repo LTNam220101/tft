@@ -516,14 +516,14 @@ function calculateTeamScoreFromCounts(
 
   // Cost Penalty
   for (const c of team) {
-    totalScore += c.cost * c.cost
+    totalScore += c.cost
   }
 
   // Cost-tier penalty only when optimizing *for* that final board size (not at intermediate beam steps).
   if (targetTeamSize === 7) {
     for (const c of team) {
       const cost = c.cost ?? 0
-      if (cost === 5) totalScore -= 25
+      if (cost === 5) totalScore -= 50
       else if (cost === 4) totalScore -= 16
     }
   } else if (targetTeamSize === 8) {

@@ -881,19 +881,18 @@ export function evaluateTeamCompositionBalance(
   for (const c of team) {
     const role = getChampionRole(c)
     const cost = (c.cost ?? 1) as number
-    const slots = getChampionSlotCost(c)
 
     if (role === 'tank') {
-      tankCount += slots
-      if (cost >= 4) highCostTankCount += slots
+      tankCount += 1
+      if (cost >= 4) highCostTankCount += 1
     } else if (role === 'bruiser') {
-      bruiserCount += slots
-      if (cost >= 4) highCostTankCount += slots
+      bruiserCount += 1
+      if (cost >= 4) highCostTankCount += 1
     } else if (role === 'carry') {
-      carryCount += slots
-      if (cost >= 4) highCostCarryCount += slots
+      carryCount += 1
+      if (cost >= 4) highCostCarryCount += 1
     } else {
-      supportCount += slots
+      supportCount += 1
     }
   }
 
