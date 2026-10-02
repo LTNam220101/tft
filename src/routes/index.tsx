@@ -98,9 +98,48 @@ function HomeComponent() {
     const [blockFilter, setBlockFilter] = useState<number | null>(null);
 
     const suggest = useAction(api.optimizer.suggestTeams);
+    const parsePrompt = useAction(api.typesafeOptimizer.parseOptimizerPrompt);
+
+    const [aiPrompt, setAiPrompt] = useState("");
+    const [aiParsing, setAiParsing] = useState(false);
+    const [aiFeedback, setAiFeedback] = useState<{ summary: string; confidence: number } | null>(null);
 
     const [results, setResults] = useState<any[] | null>(null);
     const [loading, setLoading] = useState(false);
+
+    const handleAiSearch = async (promptText?: string) => {
+        const textToParse = (promptText ?? aiPrompt).trim();
+        if (!textToParse) return;
+        setAiParsing(true);
+        setAiFeedback(null);
+        try {
+            const parsed = await parsePrompt({ prompt: textToParse });
+            setSelectedChampIds(parsed.mustHaveChampIds);
+            setSelectedEmblemKeys(parsed.emblemIds);
+            setTeamSize(parsed.teamSize);
+            setOptMode(parsed.mode);
+            setAiFeedback({
+                summary: parsed.summary,
+                confidence: parsed.confidence,
+            });
+
+            setLoading(true);
+            setResults(null);
+            const res = await suggest({
+                emblemIds: parsed.emblemIds,
+                teamSize: parsed.teamSize,
+                mode: parsed.mode,
+                mustHaveChampIds: parsed.mustHaveChampIds,
+                blockedChampIds: [],
+            });
+            setResults(res);
+        } catch (err) {
+            console.error("AI Search failed:", err);
+        } finally {
+            setAiParsing(false);
+            setLoading(false);
+        }
+    };
 
     /** Per-board hover: link champion portraits ↔ trait pills via trait `id` / `key`. */
     const [boardHover, setBoardHover] = useState<
@@ -207,13 +246,89 @@ function HomeComponent() {
 
     return (
         <div className="min-h-screen bg-[#0a0a0f] text-gray-100 font-sans p-4 md:p-8">
-            <header className="max-w-6xl mx-auto mb-12 text-center">
+            <header className="max-w-6xl mx-auto mb-10 text-center">
                 <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-700 bg-clip-text text-transparent mb-4 tracking-tight">
                     TFT SET 18 OPTIMIZER
                 </h1>
-                <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-6">
                     Select your emblems and discover the most powerful board combinations.
                 </p>
+
+                {/* AI Natural Language Prompt Search */}
+                <div className="max-w-3xl mx-auto bg-gradient-to-b from-[#1c1b2b] to-[#12121c] p-4 rounded-2xl border border-amber-500/30 shadow-2xl backdrop-blur-md">
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            handleAiSearch();
+                        }}
+                        className="flex flex-col sm:flex-row gap-3"
+                    >
+                        <div className="relative flex-1">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 font-bold text-sm">
+                                ✨ AI
+                            </span>
+                            <input
+                                type="text"
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                placeholder="Gõ yêu cầu tự nhiên (VD: 'Xoay quanh Ahri 8 Pháp Sư, tank cứng', 'Fast 8 bài vật lý wide flex')..."
+                                className="w-full pl-12 pr-4 py-3 bg-[#0c0c14] border border-white/10 rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={aiParsing || loading}
+                            className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-sm rounded-xl transition shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                        >
+                            {aiParsing ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                    <span>Đang phân tích...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>Gợi ý bằng AI</span>
+                                    <span>→</span>
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    {/* Quick Suggestions Chips */}
+                    <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-white/5 text-xs text-gray-400">
+                        <span className="text-gray-500">Gợi ý nhanh:</span>
+                        {[
+                            "Xoay quanh Ahri, dàn tank cứng",
+                            "Fast 8 flex nhiều hệ wide",
+                            "Sett carry reroll cấp 8",
+                        ].map((chip) => (
+                            <button
+                                key={chip}
+                                type="button"
+                                onClick={() => {
+                                    setAiPrompt(chip);
+                                    handleAiSearch(chip);
+                                }}
+                                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 border border-white/10 transition cursor-pointer"
+                            >
+                                {chip}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* AI Feedback Badge */}
+                    {aiFeedback && (
+                        <div className="mt-3 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 flex items-center justify-between">
+                            <span className="flex items-center gap-2 font-mono">
+                                <span>🎯</span>
+                                <span>{aiFeedback.summary}</span>
+                            </span>
+                            <span className="text-[10px] text-amber-400 font-semibold bg-amber-500/20 px-2 py-0.5 rounded">
+                                Độ tin cậy: {(aiFeedback.confidence * 100).toFixed(0)}%
+                            </span>
+                        </div>
+                    )}
+                </div>
             </header>
 
             <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">

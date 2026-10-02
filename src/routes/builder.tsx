@@ -341,14 +341,32 @@ function ChampCard({
     );
 }
 
+function formatItemEffects(effects?: Record<string, number>): string {
+    if (!effects) return "";
+    const parts: string[] = [];
+    if (effects.Health) parts.push(`+${effects.Health} HP`);
+    if (effects.AD) parts.push(`+${Math.round(effects.AD * 100)}% AD`);
+    if (effects.AP) parts.push(`+${effects.AP} AP`);
+    if (effects.Armor) parts.push(`+${effects.Armor} Armor`);
+    if (effects.MagicResist) parts.push(`+${effects.MagicResist} MR`);
+    const as = effects.AS ?? effects.AttackSpeed;
+    if (as) parts.push(`+${as > 1 ? Math.round(as) : Math.round(as * 100)}% AS`);
+    const crit = effects.CritChance;
+    if (crit) parts.push(`+${crit > 1 ? Math.round(crit) : Math.round(crit * 100)}% Crit`);
+    if (effects.Mana) parts.push(`+${effects.Mana} Mana`);
+    return parts.join(", ");
+}
+
 // ── ItemCard (bottom items picker) ────────────────────────────────────────────
 function ItemCard({ item, onDragStart }: { item: any; onDragStart: (e: React.DragEvent) => void }) {
+    const fxSummary = formatItemEffects(item.effects);
+    const tooltip = fxSummary ? `${item.name}\n${fxSummary}` : item.name;
     return (
         <div
             className="relative cursor-grab active:cursor-grabbing group"
             draggable
             onDragStart={onDragStart}
-            title={item.name}
+            title={tooltip}
         >
             <img
                 src={getImageUrl(item.iconPath)} alt={item.name}
@@ -363,7 +381,7 @@ function ItemCard({ item, onDragStart }: { item: any; onDragStart: (e: React.Dra
 
 // ── Stat calculation ──────────────────────────────────────────────────────────
 type ComputedStats = {
-    hp: number; ad: number; armor: number; mr: number;
+    hp: number; ad: number; ap: number; armor: number; mr: number;
     as: number; mana: number; initialMana: number; range: number; crit: number;
 };
 
@@ -386,7 +404,9 @@ function calcStats(
     let hpFlat = 0;
     let armorFlat = 0;
     let mrFlat = 0;
-    let asFlat = 0;
+    let asPct = 0;
+    let critFlat = 0;
+    let apFlat = 0;
 
     for (const ik of equippedItemKeys) {
         const fx = itemsByKey.get(ik)?.effects;
@@ -395,26 +415,37 @@ function calcStats(
         if (fx.Health != null) hpFlat += fx.Health;
         if (fx.Armor != null) armorFlat += fx.Armor;
         if (fx.MagicResist != null) mrFlat += fx.MagicResist;
-        if (fx.AttackSpeed != null) asFlat += fx.AttackSpeed;
+        if (fx.AP != null) apFlat += fx.AP;
+
+        const asVal = fx.AS ?? fx.AttackSpeed;
+        if (asVal != null) {
+            asPct += asVal > 1 ? asVal / 100 : asVal;
+        }
+
+        const critVal = fx.CritChance;
+        if (critVal != null) {
+            critFlat += critVal > 1 ? critVal / 100 : critVal;
+        }
     }
 
     return {
         hp: Math.round(scaledHp + hpFlat),
         ad: Math.round(scaledAd * (1 + adPct)),
+        ap: 100 + apFlat,
         armor: (base.armor ?? 0) + armorFlat,
         mr: (base.magicResist ?? 0) + mrFlat,
-        as: parseFloat(((base.attackSpeed ?? 0) + asFlat).toFixed(3)),
+        as: parseFloat(((base.attackSpeed ?? 0) * (1 + asPct)).toFixed(3)),
         mana: base.mana ?? 0,
         initialMana: base.initialMana ?? 0,
         range: base.range ?? 0,
-        crit: base.critChance ?? 0.25,
+        crit: Math.min(1.0, (base.critChance ?? 0.25) + critFlat),
     };
 }
 
 // ── StatPanel ─────────────────────────────────────────────────────────────────
 function StatPanel({
     champ, star, equippedItemKeys, itemsByKey, isOnBoard,
-    onStarChange, onRemoveFromBoard,
+    onStarChange, onRemoveFromBoard, onEquipItem,
 }: {
     champ: any;
     star: 1 | 2 | 3;
@@ -423,21 +454,57 @@ function StatPanel({
     isOnBoard: boolean;
     onStarChange: (s: 1 | 2 | 3) => void;
     onRemoveFromBoard: () => void;
+    onEquipItem?: (itemKey: string) => void;
 }) {
     const stats = calcStats(champ, star, equippedItemKeys, itemsByKey);
     const border = costBorder(champ.cost);
 
+    const getBisItems = useAction(api.typesafeItems.recommendItemsForChampion);
+    const [bisData, setBisData] = useState<any | null>(null);
+    const [bisLoading, setBisLoading] = useState(false);
+
+    useEffect(() => {
+        if (!champ?.key) return;
+        let isMounted = true;
+        setBisLoading(true);
+        getBisItems({ champKey: champ.key })
+            .then(res => {
+                if (isMounted) setBisData(res);
+            })
+            .catch(err => {
+                console.error("BiS recommendation failed:", err);
+            })
+            .finally(() => {
+                if (isMounted) setBisLoading(false);
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, [champ?.key]);
+
     return (
-        <div className="w-52 shrink-0 sticky top-4">
+        <div className="w-56 shrink-0 sticky top-4">
             <div className="bg-[#16161f] rounded-2xl border border-white/5 p-3 space-y-3">
                 {/* Header */}
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0" style={{ border: `2px solid ${border}` }}>
+                    <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0" style={{ border: `2px solid ${border}` }}>
                         <img src={getImageUrl(champ.iconPath)} alt={champ.name} className="w-full h-full object-cover object-top" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-gray-100 truncate">{champ.name}</p>
-                        <p className="text-[10px] text-gray-500">${champ.cost} cost</p>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="text-[10px] text-gray-400 font-mono">${champ.cost}</span>
+                            {bisData?.roleNameVi ? (
+                                <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 truncate">
+                                    <span>{bisData.roleIcon}</span>
+                                    <span>{bisData.roleNameVi}</span>
+                                </span>
+                            ) : champ.role ? (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-gray-400 capitalize">
+                                    {champ.role}
+                                </span>
+                            ) : null}
+                        </div>
                     </div>
                 </div>
 
@@ -468,6 +535,7 @@ function StatPanel({
                         {([
                             { label: "HP",    value: stats.hp,                          color: "text-red-400" },
                             { label: "AD",    value: stats.ad,                          color: "text-orange-400" },
+                            { label: "AP",    value: stats.ap,                          color: "text-purple-300" },
                             { label: "Armor", value: stats.armor,                       color: "text-blue-400" },
                             { label: "MR",    value: stats.mr,                          color: "text-purple-400" },
                             { label: "AS",    value: stats.as,                          color: "text-yellow-400" },
@@ -499,11 +567,88 @@ function StatPanel({
                     </div>
                 )}
 
+                {/* Champion Ability / Skill */}
+                {(champ.ability || bisData?.abilityAnalysis) && (
+                    <div className="pt-2 border-t border-white/5 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-cyan-300 flex items-center gap-1">
+                                <span>⚡ Kỹ năng</span>
+                            </span>
+                            {stats && stats.mana > 0 ? (
+                                <span className="text-[8.5px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-800/40 px-1 py-0.2 rounded">
+                                    💧 {stats.initialMana}/{stats.mana}
+                                </span>
+                            ) : (
+                                <span className="text-[8.5px] text-gray-500 bg-white/5 px-1 py-0.2 rounded font-mono">
+                                    Nội tại
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="bg-black/30 rounded-lg p-2 border border-white/5 space-y-1">
+                            <p className="text-[11px] font-bold text-gray-200">
+                                {champ.ability?.name || bisData?.abilityAnalysis?.name || "Kỹ năng"}
+                            </p>
+                            
+                            {/* Scaling stats tags */}
+                            {bisData?.abilityAnalysis?.scalingTags && bisData.abilityAnalysis.scalingTags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                    {bisData.abilityAnalysis.scalingTags.map((tag: string) => (
+                                        <span key={tag} className="text-[7.5px] px-1 py-0.2 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30 font-medium">
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Clean description */}
+                            <p className="text-[9px] text-gray-400 leading-relaxed max-h-24 overflow-y-auto">
+                                {bisData?.abilityAnalysis?.cleanDescription || champ.ability?.desc || "Chưa có mô tả chi tiết."}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* AI BiS Item Recommendations */}
+                <div className="pt-2 border-t border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
+                            <span>✨ Trang bị chuẩn (BiS)</span>
+                            {bisData?.source === 'jev' && (
+                                <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-mono">Jev</span>
+                            )}
+                        </span>
+                        {bisLoading && <span className="text-[9px] text-gray-500 animate-pulse">Đang tính...</span>}
+                    </div>
+                    {bisData?.recommendedItems && bisData.recommendedItems.length > 0 ? (
+                        <div className="space-y-1.5">
+                            <p className="text-[9px] text-gray-400 leading-tight italic">
+                                {bisData.roleDescription || bisData.recommendedItems[0]?.reason}
+                            </p>
+                            <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                                {bisData.recommendedItems.map((item: any) => (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => onEquipItem?.(item.key)}
+                                        title={`${item.tier || 'BiS'}: ${item.name} (${item.score}★) — Click để trang bị`}
+                                        className="group relative p-1 rounded bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-400/80 transition flex flex-col items-center cursor-pointer"
+                                    >
+                                        <img src={getImageUrl(item.iconPath)} alt={item.name} className="w-7 h-7 rounded object-cover" />
+                                        <span className="text-[8px] text-amber-400 font-mono mt-0.5 font-bold">{item.score}★</span>
+                                        <span className="text-[7px] text-gray-400 font-mono tracking-tighter uppercase">{item.tier || 'BiS'}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+
                 {/* Remove button */}
                 {isOnBoard && (
                     <button
                         onClick={onRemoveFromBoard}
-                        className="w-full py-1 rounded-lg text-[10px] text-red-500 border border-red-500/20 hover:bg-red-500/10 transition-all"
+                        className="w-full py-1 rounded-lg text-[10px] text-red-500 border border-red-500/20 hover:bg-red-500/10 transition-all cursor-pointer"
                     >
                         Remove from board
                     </button>
@@ -519,6 +664,10 @@ function BuilderComponent() {
     const allTraits    = useQuery(api.queries.getTraits,     { setKey: ACTIVE_SET_KEY }) ?? [];
     const allItems     = useQuery(api.queries.getItems,      { setKey: ACTIVE_SET_KEY }) ?? [];
     const suggest      = useAction(api.optimizer.suggestTeams);
+    const critiqueComp = useAction(api.typesafeCritique.critiqueTeamComposition);
+
+    const [teamCritique, setTeamCritique] = useState<any | null>(null);
+    const [critiqueLoading, setCritiqueLoading] = useState(false);
 
     const champByKey = useMemo(() => new Map(allChampions.map(c => [c.key!, c])), [allChampions]);
     const traitByKey = useMemo(() => new Map(allTraits.map(t => [t.key!, t])), [allTraits]);
@@ -531,6 +680,30 @@ function BuilderComponent() {
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [champStars, setChampStars] = useState<Record<string, 1 | 2 | 3>>({});
     const [traitTooltip, setTraitTooltip] = useState<{ t: ActiveTrait; anchorRect: DOMRect } | null>(null);
+
+    const handleEquipItem = (itemKey: string) => {
+        if (!selectedKey) return;
+        setChampItems(prev => {
+            const current = prev[selectedKey] ?? [];
+            if (current.length < 3 && !current.includes(itemKey)) {
+                return { ...prev, [selectedKey]: [...current, itemKey] };
+            }
+            return prev;
+        });
+    };
+
+    const handleEvaluateComp = async () => {
+        if (slots.filter(Boolean).length === 0) return;
+        setCritiqueLoading(true);
+        try {
+            const res = await critiqueComp({ slots, champItems });
+            setTeamCritique(res);
+        } catch (e) {
+            console.error("Critique failed:", e);
+        } finally {
+            setCritiqueLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (!traitTooltip) return;
@@ -603,10 +776,16 @@ function BuilderComponent() {
 
     const pickerItems = useMemo(() => {
         let list = allItems;
-        if (itemTypeFilter === "emblem")   list = list.filter(i => i.isEmblem);
-        else if (itemTypeFilter === "radiant")  list = list.filter(i => i.name?.toLowerCase().includes("radiant"));
-        else if (itemTypeFilter === "artifact") list = list.filter(i => i.nameId?.toLowerCase().includes("artifact"));
-        else if (itemTypeFilter === "normal")   list = list.filter(i => !i.isEmblem && !i.name?.toLowerCase().includes("radiant") && !i.nameId?.toLowerCase().includes("artifact"));
+        if (itemTypeFilter !== "all") {
+            list = list.filter(i => {
+                if (i.itemType) return i.itemType === itemTypeFilter;
+                if (itemTypeFilter === "emblem") return i.isEmblem;
+                if (itemTypeFilter === "radiant") return i.name?.toLowerCase().includes("radiant");
+                if (itemTypeFilter === "artifact") return i.nameId?.toLowerCase().includes("artifact");
+                if (itemTypeFilter === "normal") return !i.isEmblem && !i.name?.toLowerCase().includes("radiant") && !i.nameId?.toLowerCase().includes("artifact");
+                return true;
+            });
+        }
         if (itemSearch.trim()) {
             const q = itemSearch.toLowerCase();
             list = list.filter(i => i.name?.toLowerCase().includes(q));
@@ -811,8 +990,8 @@ function BuilderComponent() {
                 {/* ── TOP ROW: Traits + Board ─────────────────────────────── */}
                 <div className="flex gap-4 items-start">
 
-                    {/* Traits panel */}
-                    <div className="w-44 shrink-0 sticky top-4">
+                    {/* Traits & AI Critique panel */}
+                    <div className="w-48 shrink-0 sticky top-4 space-y-3">
                         <div className="bg-[#16161f] rounded-2xl border border-white/5 p-3">
                             <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Traits</h2>
                             {activeTraits.length === 0
@@ -827,6 +1006,61 @@ function BuilderComponent() {
                                     />
                                 ))}</div>
                             }
+                        </div>
+
+                        {/* AI Team Critique Card */}
+                        <div className="bg-[#16161f] rounded-2xl border border-amber-500/25 p-3 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                                    <span>✨ AI Đánh giá</span>
+                                    {teamCritique?.source === 'jev' && (
+                                        <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1 rounded font-mono">Jev</span>
+                                    )}
+                                </span>
+                                <button
+                                    onClick={handleEvaluateComp}
+                                    disabled={slots.filter(Boolean).length === 0 || critiqueLoading}
+                                    className="text-[10px] px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded border border-amber-500/30 transition disabled:opacity-40 cursor-pointer font-semibold"
+                                >
+                                    {critiqueLoading ? "Đang tính..." : "Phân tích"}
+                                </button>
+                            </div>
+
+                            {teamCritique ? (
+                                <div className="space-y-2 text-xs">
+                                    <div className="space-y-1 bg-black/30 p-2 rounded-lg border border-white/5">
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className="text-gray-400">🛡️ Chống chịu:</span>
+                                            <span className="text-amber-400 font-mono tracking-widest">
+                                                {"★".repeat(teamCritique.frontlineRating)}{"☆".repeat(3 - teamCritique.frontlineRating)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className="text-gray-400">⚔️ Sát thương:</span>
+                                            <span className="text-amber-400 font-mono tracking-widest">
+                                                {"★".repeat(teamCritique.damageRating)}{"☆".repeat(3 - teamCritique.damageRating)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-1 flex-wrap">
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${teamCritique.hasArmorShred || teamCritique.hasMagicShred ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                                            {teamCritique.hasArmorShred || teamCritique.hasMagicShred ? "✓ Giảm Giáp/KP" : "✗ Thiếu Shred"}
+                                        </span>
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${teamCritique.hasAntiHeal ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                                            {teamCritique.hasAntiHeal ? "✓ Giảm Hồi Máu" : "✗ Thiếu Vết Thương"}
+                                        </span>
+                                    </div>
+
+                                    <div className="p-2 rounded bg-black/40 border border-white/5 text-[10px] text-gray-300 leading-snug">
+                                        {teamCritique.advice}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-[10px] text-gray-500 italic">
+                                    {slots.filter(Boolean).length > 0 ? "Bấm 'Phân tích' để AI đánh giá điểm mạnh/yếu đội hình." : "Đặt tướng lên bàn cờ để AI phân tích."}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -1002,6 +1236,7 @@ function BuilderComponent() {
                             isOnBoard={boardChampKeys.has(selectedKey!)}
                             onStarChange={s => setChampStar(selectedKey!, s)}
                             onRemoveFromBoard={removeSelectedFromBoard}
+                            onEquipItem={handleEquipItem}
                         />
                     )}
                 </div>

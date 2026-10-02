@@ -25,8 +25,8 @@ const SET_TRAITS_FILTER = 'TFTSet18'
 /** Exclude team-up / revival traits if present. */
 const TEAMUP_TRAIT_ID_PREFIX = 'TFT18_Teamup_'
 
-/** tftitems nameId prefix for set-scoped items. */
-const ITEM_NAMEID_PREFIX = 'DA_18_'
+/** tftitems nameId prefixes for set-scoped items. */
+const ITEM_NAMEID_PREFIXES = ['DA_', 'TFT18_'] as const
 
 /**
  * Trait display names that count as "regions" for World Runes mode (`isRegion`) and UI.
@@ -79,6 +79,35 @@ function stripNulls<T extends object>(obj: T | undefined): { [K in keyof T]?: Ex
   ) as { [K in keyof T]?: Exclude<T[K], null> }
 }
 
+/** Sanitize champion ability data from CommunityDragon */
+function cleanAbility(ability?: {
+  name?: string
+  desc?: string
+  icon?: string
+  variables?: Array<{ name?: string; value?: number[] }>
+}) {
+  if (!ability) return undefined
+  const cleaned: {
+    name?: string
+    desc?: string
+    icon?: string
+    variables?: Array<{ name: string; value: number[] }>
+  } = {}
+  if (ability.name) cleaned.name = ability.name
+  if (ability.desc) cleaned.desc = ability.desc
+  if (ability.icon) cleaned.icon = ability.icon
+  if (Array.isArray(ability.variables) && ability.variables.length > 0) {
+    const vars = ability.variables
+      .filter((v) => v && v.name && Array.isArray(v.value))
+      .map((v) => ({
+        name: v.name!,
+        value: v.value!.filter((n) => typeof n === 'number'),
+      }))
+    if (vars.length > 0) cleaned.variables = vars
+  }
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined
+}
+
 /** Innate-only (used as base for merge). */
 function flattenInnateConstants(t: RawTrait): Record<string, number> {
   const map: Record<string, number> = {}
@@ -125,7 +154,10 @@ interface CdragonChampion {
 
 interface CdragonItem {
   apiName: string
+  name?: string
   effects?: Record<string, number>
+  tags?: string[]
+  isAugment?: boolean
 }
 
 
@@ -168,11 +200,31 @@ export const seedFromApi = action({
       if (c.apiName) cdragonChampMap.set(c.apiName, c)
       if (c.characterName) cdragonChampMap.set(c.characterName, c)
     }
-    const itemEffectsMap = new Map<string, Record<string, number>>(
-      (cdragon.items ?? [])
-        .filter((i) => i.effects != null)
-        .map((i) => [i.apiName, i.effects!]),
-    )
+    const norm = (s?: string) => (s || '').toLowerCase().replace(/['’\s_-]/g, '')
+    const effectMapByApiName = new Map<string, Record<string, number>>()
+    const effectMapByName = new Map<string, Record<string, number>>()
+
+    for (const i of cdragon.items ?? []) {
+      if (!i.effects || Object.keys(i.effects).length === 0) continue
+      if (i.isAugment) continue
+
+      if (i.apiName) {
+        effectMapByApiName.set(i.apiName, i.effects)
+      }
+
+      const n = norm(i.name)
+      if (!n) continue
+
+      const isPriority =
+        i.apiName.startsWith('TFT_Item_') ||
+        i.apiName.startsWith('TFT5_Item_') ||
+        i.apiName.includes('Ornn') ||
+        i.apiName.includes('Artifact')
+
+      if (!effectMapByName.has(n) || isPriority) {
+        effectMapByName.set(n, i.effects)
+      }
+    }
 
     const championSetRaw = (championsJson as Record<string, RawChampion[] | undefined>)?.[
       SET_CHAMPIONS_KEY
@@ -191,6 +243,7 @@ export const seedFromApi = action({
         const range = cd?.stats?.range ?? 1
         const desc = cd?.ability?.desc ?? ''
         const role = determineChampionRole(c.display_name, cd?.role, desc, range, traits)
+        const ability = cleanAbility(cd?.ability)
 
         return {
           key: c.character_id,
@@ -202,6 +255,7 @@ export const seedFromApi = action({
           iconPath: c.squareIconPath,
           path: c.path,
           stats: stripNulls(cd?.stats),
+          ability,
         }
       })
 
@@ -232,21 +286,91 @@ export const seedFromApi = action({
         })),
       }))
 
-    const items = (itemsJson as RawItem[])
-      .filter(
-        (i) =>
-          i.nameId?.startsWith(ITEM_NAMEID_PREFIX) &&
-          !i.name.includes('Recipe') &&
-          !i.nameId.includes('_Placeholder'),
-      )
-      .map((i) => ({
-        key: i.guid,
-        name: i.name,
-        nameId: i.nameId,
-        iconPath: i.squareIconPath,
-        isEmblem: i.name.includes('Emblem'),
-        effects: filterNullRecord(itemEffectsMap.get(i.nameId)),
-      }))
+    const cdItemMap = new Map((cdragon.items ?? []).map((i) => [i.apiName, i]))
+    const seenItemKeys = new Set<string>()
+    const items: Array<{
+      key: string
+      name: string
+      nameId: string
+      iconPath: string
+      itemType: 'normal' | 'emblem' | 'radiant' | 'artifact'
+      isEmblem: boolean
+      effects?: Record<string, number>
+    }> = []
+
+    for (const raw of itemsJson as RawItem[]) {
+      if (!raw.nameId || !raw.name) continue
+      if (!ITEM_NAMEID_PREFIXES.some((p) => raw.nameId.startsWith(p))) continue
+
+      const name = raw.name
+      const nameId = raw.nameId
+      const icon = raw.squareIconPath || ''
+
+      // Skip non-equipable game items: recipes, placeholders, consumables, potions, boosters, wands/zaps, augments, components
+      if (name.includes('Recipe') || nameId.includes('Recipe') || nameId.includes('_Placeholder')) continue
+      if (nameId.includes('Consumable') || nameId.includes('Booster') || nameId.includes('Potion')) continue
+      if (nameId.includes('Upgrade') || nameId.includes('Prismatic') || icon.includes('/ZAPS/Wands/')) continue
+      if (icon.includes('/Augments/') || nameId.includes('Augment') || nameId.includes('TraitAugment')) continue
+      if (nameId.includes('Component')) continue
+      if (nameId.includes('Radiantize') || nameId.includes('Artifactinate') || nameId.includes('Chest')) continue
+
+      const cd = cdItemMap.get(nameId)
+      const tags = cd?.tags ?? []
+      if (tags.includes('Consumable') || tags.includes('component')) continue
+
+      let itemType: 'normal' | 'emblem' | 'radiant' | 'artifact' | null = null
+      let isEmblem = false
+
+      if (name.includes('Emblem') || nameId.includes('Emblem') || tags.includes('{ebcd1bac}')) {
+        itemType = 'emblem'
+        isEmblem = true
+      } else if (name.toLowerCase().includes('radiant') || nameId.toLowerCase().includes('radiant') || tags.includes('{6ef5c598}')) {
+        itemType = 'radiant'
+      } else if (nameId.toLowerCase().includes('artifact') || tags.includes('{44ace175}')) {
+        itemType = 'artifact'
+      } else if (tags.includes('{7ea41d13}') || name.includes('Tactician')) {
+        itemType = 'normal'
+      }
+
+      if (!itemType) continue
+
+      const key = raw.guid || nameId
+      if (seenItemKeys.has(key)) continue
+      seenItemKeys.add(key)
+
+      // Resolve item effects:
+      // Direct on DA_ item first
+      let rawEffects = (cd?.effects && Object.keys(cd?.effects).length > 0) ? cd.effects : undefined
+
+      // Fallback: look up canonical item stats by normalized name (for non-emblems to avoid obsolete set trait stats)
+      if (!rawEffects && !isEmblem) {
+        rawEffects = effectMapByName.get(norm(name))
+      }
+
+      // Fallback: look up by artifact/radiant apiName conversions
+      if (!rawEffects && !isEmblem) {
+        if (nameId.startsWith('DA_Artifact_')) {
+          const suffix = nameId.replace('DA_Artifact_', '')
+          rawEffects =
+            effectMapByApiName.get(`TFT_Item_Artifact_${suffix}`) ||
+            effectMapByApiName.get(`TFT4_Item_Ornn${suffix}`) ||
+            effectMapByApiName.get(`TFT9_Item_Ornn${suffix}`)
+        } else if (nameId.startsWith('DA_') && nameId.endsWith('Radiant')) {
+          const baseName = nameId.replace('DA_', '').replace('Radiant', '')
+          rawEffects = effectMapByApiName.get(`TFT5_Item_${baseName}Radiant`)
+        }
+      }
+
+      items.push({
+        key,
+        name,
+        nameId,
+        iconPath: icon,
+        itemType,
+        isEmblem,
+        effects: filterNullRecord(rawEffects),
+      })
+    }
 
     const stats: UpsertStats = await ctx.runMutation(
       internal.mutations.seed.insertAll,
@@ -323,8 +447,10 @@ export const insertAll = internalMutation({
       }
     }
 
+    const validItemKeys = new Set<string>()
     for (const i of items) {
       if (!i.key) continue
+      validItemKeys.add(i.key)
       const payload = { ...i, setKey }
       const existing = await db
         .query('items')
@@ -336,6 +462,16 @@ export const insertAll = internalMutation({
       } else {
         await db.insert('items', payload)
         itemsInserted++
+      }
+    }
+
+    const existingItems = await db
+      .query('items')
+      .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey))
+      .collect()
+    for (const ex of existingItems) {
+      if (ex.key && !validItemKeys.has(ex.key)) {
+        await db.delete(ex._id)
       }
     }
 

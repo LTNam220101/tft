@@ -23,6 +23,16 @@ export const getTraits = query({
     },
 });
 
+export const getTraitsInternal = internalQuery({
+    args: { setKey: v.string() },
+    handler: async (ctx, { setKey }) => {
+        return await ctx.db
+            .query("traits")
+            .withIndex("by_setKey_and_key", (q) => q.eq("setKey", setKey))
+            .collect();
+    },
+});
+
 export const getItems = query({
     args: { setKey: v.optional(v.string()) },
     handler: async (ctx, { setKey }) => {

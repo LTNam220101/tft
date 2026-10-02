@@ -18,6 +18,7 @@ export const champion = v.object({
   path: v.optional(v.string()), // e.g. Characters/TFT17_Ahri
   isLocked: v.optional(v.boolean()),
   role: v.optional(v.union(v.literal('tank'), v.literal('bruiser'), v.literal('carry'), v.literal('support'))),
+  detailedRole: v.optional(v.string()),
   rawRole: v.optional(v.string()),
   /** Base stats at 1-star, sourced from cdragon/tft/en_us.json */
   stats: v.optional(v.object({
@@ -31,6 +32,16 @@ export const champion = v.object({
     range: v.optional(v.number()),
     critChance: v.optional(v.number()),
     critMultiplier: v.optional(v.number()),
+  })),
+  /** Champion ability / skill info, sourced from cdragon/tft/en_us.json */
+  ability: v.optional(v.object({
+    name: v.optional(v.string()),
+    desc: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    variables: v.optional(v.array(v.object({
+      name: v.string(),
+      value: v.array(v.number()),
+    }))),
   })),
 })
 
@@ -56,6 +67,7 @@ export const item = v.object({
   nameId: v.optional(v.string()),
   iconPath: v.optional(v.string()),
   isEmblem: v.optional(v.boolean()),
+  itemType: v.optional(v.string()),
   /** Stat bonuses from cdragon/tft/en_us.json — AD is fractional (0.1 = +10% base AD), HP/Armor/etc are flat */
   effects: v.optional(v.record(v.string(), v.number())),
 })

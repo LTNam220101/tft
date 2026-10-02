@@ -17,6 +17,11 @@ import type * as optimizerRoles from "../optimizerRoles.js";
 import type * as optimizerSetBonuses from "../optimizerSetBonuses.js";
 import type * as queries from "../queries.js";
 import type * as riot from "../riot.js";
+import type * as typesafe from "../typesafe.js";
+import type * as typesafeCritique from "../typesafeCritique.js";
+import type * as typesafeItems from "../typesafeItems.js";
+import type * as typesafeOptimizer from "../typesafeOptimizer.js";
+import type * as typesafeRoles from "../typesafeRoles.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +39,11 @@ declare const fullApi: ApiFromModules<{
   optimizerSetBonuses: typeof optimizerSetBonuses;
   queries: typeof queries;
   riot: typeof riot;
+  typesafe: typeof typesafe;
+  typesafeCritique: typeof typesafeCritique;
+  typesafeItems: typeof typesafeItems;
+  typesafeOptimizer: typeof typesafeOptimizer;
+  typesafeRoles: typeof typesafeRoles;
 }>;
 
 /**
