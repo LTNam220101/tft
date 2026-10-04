@@ -9,7 +9,7 @@ export interface ParsedOptimizerIntent {
   blockedChampIds: string[]
   emblemIds: string[]
   teamSize: number
-  mode: 'wide' | 'deep'
+  mode: 'wide' | 'deep' | 'bronze'
   summary: string
   confidence: number
 }
@@ -81,23 +81,32 @@ export const parseOptimizerPrompt = action({
         criteria: {
           deep: 'Focus on vertical synergies, hitting max-tier traits (e.g. 6/8 trait milestones), or playing around a primary carry.',
           wide: 'Focus on horizontal breadth, activating many smaller synergies (e.g. 4+ region traits, flex comps).',
+          bronze: 'Focus on Bronze for Life / Tất Tay Bậc Đồng, maximizing the number of traits active at their lowest (bronze) tier only.',
         },
       },
     }
 
     const jevResponse = await callJevSystemOne(state, questions)
-    let selectedMode: 'wide' | 'deep' = 'deep'
+    let selectedMode: 'wide' | 'deep' | 'bronze' = 'deep'
     let confidence = 0.85
 
     if (jevResponse && jevResponse.answers.mode) {
       const ans = jevResponse.answers.mode as ChoiceAnswer
-      if (ans.choice === 'wide' || ans.choice === 'deep') {
+      if (ans.choice === 'wide' || ans.choice === 'deep' || ans.choice === 'bronze') {
         selectedMode = ans.choice
         confidence = ans.confidence ?? 0.85
       }
     } else {
       // Heuristic fallback for mode
       if (
+        normalizedPrompt.includes('bronze') ||
+        normalizedPrompt.includes('bậc đồng') ||
+        normalizedPrompt.includes('bac dong') ||
+        normalizedPrompt.includes('tất tay') ||
+        normalizedPrompt.includes('tat tay')
+      ) {
+        selectedMode = 'bronze'
+      } else if (
         normalizedPrompt.includes('wide') ||
         normalizedPrompt.includes('ngang') ||
         normalizedPrompt.includes('nhiều hệ') ||
@@ -113,13 +122,21 @@ export const parseOptimizerPrompt = action({
     // Build human-friendly summary
     const summaryParts: string[] = []
     if (candidateChamps.length > 0) {
-      summaryParts.push(`Tướng: ${candidateChamps.map((c: any) => c.name).join(', ')}`)
+      summaryParts.push(`Champions: ${candidateChamps.map((c: any) => c.name).join(', ')}`)
     }
     if (candidateEmblems.length > 0) {
-      summaryParts.push(`Ấn: ${candidateEmblems.map((e: any) => e.name).join(', ')}`)
+      summaryParts.push(`Emblems: ${candidateEmblems.map((e: any) => e.name).join(', ')}`)
     }
-    summaryParts.push(`Cấp: ${extractedTeamSize}`)
-    summaryParts.push(`Chiến thuật: ${selectedMode === 'deep' ? 'Sâu (Vertical)' : 'Rộng (Wide flex)'}`)
+    summaryParts.push(`Level: ${extractedTeamSize}`)
+    summaryParts.push(
+      `Strategy: ${
+        selectedMode === 'deep'
+          ? 'Vertical (Deep)'
+          : selectedMode === 'bronze'
+            ? 'Bronze for Life'
+            : 'Wide flex'
+      }`,
+    )
 
     return {
       mustHaveChampIds,

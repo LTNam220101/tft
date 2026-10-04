@@ -38,7 +38,7 @@ export const critiqueTeamComposition = action({
         hasMagicShred: false,
         hasAntiHeal: false,
         primaryWeakness: 'empty_team',
-        advice: 'Đội hình đang trống. Hãy kéo tướng lên bàn cờ để AI đánh giá.',
+        advice: 'Board is empty. Place champions on the board to run AI evaluation.',
         source: 'heuristic',
       }
     }
@@ -154,15 +154,15 @@ export const critiqueTeamComposition = action({
 
       const adviceMap: Record<string, string> = {
         lacks_frontline:
-          'Cảnh báo: Tuyến đầu quá mỏng! Hãy thêm 1-2 tướng Đỡ đòn (Tank/Bruiser) hoặc ghép Giáp Máu/Thú Tượng.',
+          'Warning: Frontline is too fragile! Add 1-2 Tank/Bruiser champions or craft Warmog/Gargoyle.',
         lacks_damage:
-          'Cảnh báo: Thiếu sát thương kết liễu! Hãy nâng cấp tướng chủ lực 4-5 vàng hoặc dồn trang bị công.',
+          'Warning: Lacking finishing damage! Upgrade your 4/5-cost carry or equip offensive damage items.',
         no_anti_heal:
-          'Lưu ý: Thiếu Giảm Hồi Máu! Dễ bị thua trước các đội hình hút máu/hồi phục mạnh (cần Giáp Lửa / Quỷ Thư / Bùa Đỏ).',
+          'Note: Missing Anti-Heal! Vulnerable against strong sustain/healing comps (build Sunfire Cape / Morellonomicon / Red Buff).',
         no_shred:
-          'Lưu ý: Thiếu Giảm Giáp / Kháng Phép! Sẽ khó xuyên qua các Siêu Tanker đối phương (cần Cung Xanh / Dao Điện / Nỏ Sét).',
+          'Note: Missing Armor/MR Shred! Hard to penetrate heavy enemy tanks (build Last Whisper / Statikk Shiv / Ionic Spark).',
         well_balanced:
-          'Đội hình công thủ rất hài hòa, có đầy đủ chống chịu và nguồn sát thương rõ ràng.',
+          'Well balanced offense and defense with solid frontline durability and clear damage carries.',
       }
 
       return {
@@ -185,14 +185,14 @@ export const critiqueTeamComposition = action({
     const dmgRating = carryCount >= 2 ? 3 : carryCount >= 1 ? 2 : 1
 
     let primaryWeak = 'well_balanced'
-    let advice = 'Đội hình tương đối cân bằng.'
+    let advice = 'Team composition is reasonably balanced.'
 
     if (frontlineCount < 2) {
       primaryWeak = 'lacks_frontline'
-      advice = 'Tuyến đầu còn mỏng! Cần bổ sung thêm tướng Đấu Sĩ / Can Trường hoặc trang bị chống chịu.'
+      advice = 'Frontline is fragile! Consider adding Bruiser/Bastion units or defensive items.'
     } else if (carryCount < 1) {
       primaryWeak = 'lacks_damage'
-      advice = 'Thiếu chủ lực gây sát thương chính! Cần thêm carry tuyến sau.'
+      advice = 'Lacking a primary carry damage dealer! Add a backline carry unit.'
     }
 
     return {

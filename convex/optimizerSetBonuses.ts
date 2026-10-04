@@ -7,7 +7,7 @@
 export function scoreCoreTraitContribution(
     rawTraitCounts: Record<string, number>,
     traitMap: Map<string, any>,
-    mode: "wide" | "deep",
+    mode: "wide" | "deep" | "bronze",
     emblemCounts: Record<string, number>,
 ): number {
     let totalScore = 0;
@@ -23,6 +23,19 @@ export function scoreCoreTraitContribution(
                     totalScore += 5;
                 } else {
                     totalScore += 5;
+                }
+            } else if (mode === "bronze") {
+                if (traitDef.unique) {
+                    // Tộc/hệ độc nhất (unique) không kích hoạt lõi Tất Tay Bậc Đồng trong game,
+                    // nhưng không bị trừ điểm và vẫn đóng góp giá trị cơ bản cho đội hình.
+                    totalScore += 5;
+                } else if (activeEffects.length === 1) {
+                    // Mốc kích hoạt thấp nhất (Bậc Đồng / tier 1): tính điểm mạnh
+                    totalScore += emblemCounts[traitId] ? 25 : 20;
+                } else {
+                    // Vượt quá mốc thấp nhất (bậc Bạc, Vàng, Kim Cương...):
+                    // Bị trừ điểm vì không tối ưu cho Tất Tay Bậc Đồng và lãng phí slot.
+                    totalScore -= 10 * (activeEffects.length - 1);
                 }
             } else {
                 if (traitDef.unique) {

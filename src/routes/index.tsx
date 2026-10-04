@@ -62,7 +62,7 @@ function TraitResultTooltipPortal({
                 <span className="font-mono text-[10px] font-normal text-gray-500">({t.count})</span>
             </div>
             {rows.length === 0 ? (
-                <p className="text-gray-500">Chưa có mô tả trait (seed lại hoặc chạy optimize sau khi cập nhật DB).</p>
+                <p className="text-gray-500">No trait description available (re-seed or run optimizer after DB update).</p>
             ) : (
                 <ul className="space-y-2">
                     {rows.map((r, i) => (
@@ -93,7 +93,7 @@ function HomeComponent() {
     const [selectedChampIds, setSelectedChampIds] = useState<string[]>([]);
     const [blockedChampIds, setBlockedChampIds] = useState<string[]>([]);
     const [teamSize, setTeamSize] = useState(9);
-    const [optMode, setOptMode] = useState<"wide" | "deep">("wide");
+    const [optMode, setOptMode] = useState<"wide" | "deep" | "bronze">("wide");
     const [selectionFilter, setSelectionFilter] = useState<number | null>(null);
     const [blockFilter, setBlockFilter] = useState<number | null>(null);
 
@@ -271,7 +271,7 @@ function HomeComponent() {
                                 type="text"
                                 value={aiPrompt}
                                 onChange={(e) => setAiPrompt(e.target.value)}
-                                placeholder="Gõ yêu cầu tự nhiên (VD: 'Xoay quanh Ahri 8 Pháp Sư, tank cứng', 'Fast 8 bài vật lý wide flex')..."
+                                placeholder="Enter prompt (e.g. 'Play around Ahri 8 Sorcerers, tanky frontline', 'Bronze for Life level 8 flex', 'Fast 8 wide flex')..."
                                 className="w-full pl-12 pr-4 py-3 bg-[#0c0c14] border border-white/10 rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
                             />
                         </div>
@@ -283,11 +283,11 @@ function HomeComponent() {
                             {aiParsing ? (
                                 <>
                                     <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                                    <span>Đang phân tích...</span>
+                                    <span>Analyzing...</span>
                                 </>
                             ) : (
                                 <>
-                                    <span>Gợi ý bằng AI</span>
+                                    <span>AI Suggest</span>
                                     <span>→</span>
                                 </>
                             )}
@@ -296,11 +296,12 @@ function HomeComponent() {
 
                     {/* Quick Suggestions Chips */}
                     <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-white/5 text-xs text-gray-400">
-                        <span className="text-gray-500">Gợi ý nhanh:</span>
+                        <span className="text-gray-500">Quick suggestions:</span>
                         {[
-                            "Xoay quanh Ahri, dàn tank cứng",
-                            "Fast 8 flex nhiều hệ wide",
-                            "Sett carry reroll cấp 8",
+                            "Play around Ahri, solid frontline",
+                            "Bronze for Life level 8 flex",
+                            "Fast 8 wide flex composition",
+                            "Sett carry reroll level 8",
                         ].map((chip) => (
                             <button
                                 key={chip}
@@ -324,7 +325,7 @@ function HomeComponent() {
                                 <span>{aiFeedback.summary}</span>
                             </span>
                             <span className="text-[10px] text-amber-400 font-semibold bg-amber-500/20 px-2 py-0.5 rounded">
-                                Độ tin cậy: {(aiFeedback.confidence * 100).toFixed(0)}%
+                                Confidence: {(aiFeedback.confidence * 100).toFixed(0)}%
                             </span>
                         </div>
                     )}
@@ -392,25 +393,72 @@ function HomeComponent() {
                             </div>
                         </section>
 
-                        <section>
-                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                <span className="w-2 h-6 bg-blue-500 rounded-full"></span>
-                                Search Strategy
-                            </h2>
+                        <section className="relative">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <span className={`w-2 h-6 rounded-full transition-colors ${
+                                        optMode === "bronze" ? "bg-amber-600" : optMode === "deep" ? "bg-amber-500" : "bg-blue-500"
+                                    }`}></span>
+                                    Search Strategy
+                                </h2>
+                                {optMode === "bronze" && (
+                                    <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1 animate-in fade-in duration-200">
+                                        <span>🥉</span> Bronze Priority
+                                    </span>
+                                )}
+                            </div>
                             <div className="grid grid-cols-2 gap-2 bg-gray-800/50 p-1 rounded-xl">
                                 <button
+                                    type="button"
                                     onClick={() => setOptMode("wide")}
-                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${optMode === "wide" ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                                        optMode === "wide" || optMode === "bronze" ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                                    }`}
                                 >
                                     Wide
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => setOptMode("deep")}
-                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${optMode === "deep" ? 'bg-amber-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                                        optMode === "deep" ? 'bg-amber-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                                    }`}
                                 >
                                     Deep
                                 </button>
                             </div>
+
+                            {/* Float button: Bronze for Life (only appears when Wide strategy is selected) */}
+                            {(optMode === "wide" || optMode === "bronze") && (
+                                <div className="mt-3 flex justify-center animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setOptMode(optMode === "bronze" ? "wide" : "bronze")}
+                                        className={`group inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-300 shadow-xl cursor-pointer border backdrop-blur-md ${
+                                            optMode === "bronze"
+                                                ? "bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 text-white border-amber-400/80 shadow-amber-900/40 ring-2 ring-amber-400/40 scale-[1.02]"
+                                                : "bg-gray-800/90 hover:bg-gray-700/90 text-gray-300 hover:text-white border-white/10 hover:border-amber-500/40 shadow-black/40 hover:scale-[1.01]"
+                                        }`}
+                                        title="Bronze for Life augment - prioritize tier 1 traits, unique traits not penalized"
+                                    >
+                                        <span className={`text-sm transition-transform duration-200 ${optMode === "bronze" ? "scale-125" : "group-hover:scale-110"}`}>
+                                            🥉
+                                        </span>
+                                        <span>Bronze for Life</span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors ${
+                                            optMode === "bronze" ? "bg-amber-950/70 text-amber-200 border border-amber-400/30" : "bg-white/10 text-gray-400"
+                                        }`}>
+                                            {optMode === "bronze" ? "Active" : "Enable"}
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {optMode === "bronze" && (
+                                <p className="text-[11px] text-gray-400 mt-2 px-1 leading-relaxed animate-in fade-in duration-200">
+                                    💡 <strong className="text-amber-300">Bronze for Life</strong>: Heavily scores non-unique traits active at their lowest (Bronze) tier, penalizes higher tiers. Unique traits are not penalized.
+                                </p>
+                            )}
                         </section>
 
                         <section>
@@ -637,29 +685,40 @@ function HomeComponent() {
                                             <span className="h-4 w-[1px] bg-white/10"></span>
                                             <span className="text-amber-400 font-bold tracking-tight">POWER: {Math.round(team.score)}</span>
                                             <span className="h-4 w-[1px] bg-white/10 hidden sm:inline-block"></span>
-                                            <span className="text-xs px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300 font-mono" title="Tổng số slot tướng đã dùng / Kích thước đội hình">
+                                            <span className="text-xs px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-gray-300 font-mono" title="Total champion slots used / Team size">
                                                 {team.slots ?? team.champions.reduce((s: number, c: any) => s + (c.slotCost ?? (c.key === 'DA_18_ElderDragon' ? 2 : 1)), 0)}/{teamSize} Slots
                                             </span>
+                                            {optMode === "bronze" && (
+                                                <>
+                                                    <span className="h-4 w-[1px] bg-white/10 hidden sm:inline-block"></span>
+                                                    <span
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-600/20 text-amber-300 border border-amber-500/40 text-xs font-semibold"
+                                                        title="Number of non-unique traits active at their lowest (Bronze) tier"
+                                                    >
+                                                        🥉 {team.activeTraits.filter((t: any) => !t.unique && t.tier === 1).length} Bronze Traits
+                                                    </span>
+                                                </>
+                                            )}
                                             {team.balance && (
                                                 <>
                                                     <span className="h-4 w-[1px] bg-white/10 hidden sm:inline-block"></span>
                                                     <div className="flex items-center gap-1.5 text-xs font-semibold">
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                                            title="Tướng chống chịu hàng trước (Tank / Đấu sĩ)"
+                                                            title="Frontline durability champions (Tank / Bruiser)"
                                                         >
                                                             🛡️ {team.balance.frontlineCount} Tank
                                                         </span>
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                                            title="Tướng sát thương chủ lực (Carry)"
+                                                            title="Primary damage champions (Carry)"
                                                         >
                                                             ⚔️ {team.balance.carryCount} Carry
                                                         </span>
                                                         {team.balance.supportCount > 0 && (
                                                             <span
                                                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                                                title="Tướng hỗ trợ / Đa dụng (Support)"
+                                                                title="Utility & support champions (Support)"
                                                             >
                                                                 ✨ {team.balance.supportCount} SP
                                                             </span>
@@ -743,12 +802,12 @@ function HomeComponent() {
                                                                 }`}
                                                                 title={
                                                                     champ.role === 'tank'
-                                                                        ? 'Chống chịu (Tank)'
+                                                                        ? 'Tank'
                                                                         : champ.role === 'bruiser'
-                                                                        ? 'Đấu sĩ (Bruiser)'
+                                                                        ? 'Bruiser'
                                                                         : champ.role === 'support'
-                                                                        ? 'Hỗ trợ (Support)'
-                                                                        : 'Chủ lực (Carry)'
+                                                                        ? 'Support'
+                                                                        : 'Carry'
                                                                 }
                                                             >
                                                                 {champ.role === 'tank'
@@ -763,7 +822,7 @@ function HomeComponent() {
                                                         {((champ.slotCost ?? 1) === 2 || champ.key === 'DA_18_ElderDragon' || champ.name?.toLowerCase().includes('elder dragon')) && (
                                                             <div
                                                                 className="absolute top-1 right-1 px-1 rounded text-[8px] sm:text-[9px] font-bold backdrop-blur-md shadow-md bg-amber-950/80 text-amber-300 border border-amber-500/40"
-                                                                title="Chiếm 2 slot trên bàn cờ"
+                                                                title="Takes 2 slots on board"
                                                             >
                                                                 2👥
                                                             </div>
@@ -802,17 +861,26 @@ function HomeComponent() {
                                                             setTraitTooltipHover(null)
                                                             setBoardHover(null)
                                                         }}
-                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 border text-left ${isRegion
-                                                            ? "bg-blue-600/20 border-blue-500 text-blue-400"
-                                                            : isMax || isUnique
-                                                                ? "bg-amber-500 border-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.2)]"
-                                                                : t.tier >= 2
-                                                                    ? "bg-gray-800 border-amber-500/50 text-amber-400"
-                                                                    : "bg-gray-800 border-white/5 text-gray-400"
+                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 border text-left ${
+                                                            isRegion
+                                                                ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                                                                : isMax || isUnique
+                                                                    ? "bg-amber-500 border-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.2)]"
+                                                                    : t.tier >= 2
+                                                                        ? "bg-gray-800 border-amber-500/50 text-amber-400"
+                                                                        : "bg-gray-800 border-white/5 text-gray-400"
                                                             } ${hi ? "ring-2 ring-amber-300 scale-[1.02] shadow-lg" : ""} ${dim ? "opacity-40" : ""}`}
                                                     >
                                                         <div className="relative">
-                                                            <img src={getImageUrl(t.iconPath)} className={`w-4 h-4 object-contain ${isMax || isUnique ? "brightness-0" : "brightness-110"}`} alt="" />
+                                                            <img
+                                                                src={getImageUrl(t.iconPath)}
+                                                                className={`w-4 h-4 object-contain ${
+                                                                    isMax || isUnique
+                                                                        ? "brightness-0"
+                                                                        : "brightness-110"
+                                                                }`}
+                                                                alt=""
+                                                            />
                                                         </div>
                                                         <div className="flex flex-col leading-none">
                                                             <div className="flex items-center gap-1">

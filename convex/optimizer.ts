@@ -28,7 +28,9 @@ export const suggestTeams = action({
     traitLadder: v.optional(v.boolean()),
     emblemIds: v.array(v.string()), // IDs or Keys of emblems
     teamSize: v.number(),
-    mode: v.optional(v.union(v.literal('wide'), v.literal('deep'))),
+    mode: v.optional(
+      v.union(v.literal('wide'), v.literal('deep'), v.literal('bronze')),
+    ),
     mustHaveChampIds: v.optional(v.array(v.string())), // IDs of champions to force include
     blockedChampIds: v.optional(v.array(v.string())), // IDs of champions to exclude
   },
@@ -486,7 +488,7 @@ function calculateTeamScoreFromCounts(
   teamSize: number,
   emblemCounts: Record<string, number>,
   traitMap: Map<string, any>,
-  mode: 'wide' | 'deep',
+  mode: 'wide' | 'deep' | 'bronze',
   team: Array<any>,
   setKey: string,
   targetTeamSize: number,

@@ -169,7 +169,7 @@ function TraitTooltipPortal({ t, anchorRect }: { t: ActiveTrait; anchorRect: DOM
                 <span className="font-mono text-[10px] font-normal text-gray-500">({t.count})</span>
             </div>
             {rows.length === 0 ? (
-                <p className="text-gray-500">Chưa có mô tả trait (seed lại hoặc chạy optimize sau khi cập nhật DB).</p>
+                <p className="text-gray-500">No trait description available (re-seed or run optimizer after DB update).</p>
             ) : (
                 <ul className="space-y-2">
                     {rows.map((r, i) => (
@@ -330,7 +330,7 @@ function ChampCard({
                 {(champ.key === 'DA_18_ElderDragon' || champ.name?.toLowerCase().includes('elder dragon')) && (
                     <div
                         className="absolute top-0 right-0 px-1 rounded-bl text-[7px] font-bold bg-amber-950/90 text-amber-300 border-l border-b border-amber-500/40"
-                        title="Chiếm 2 slot trên bàn cờ"
+                        title="Takes 2 slots on board"
                     >
                         2👥
                     </div>
@@ -572,7 +572,7 @@ function StatPanel({
                     <div className="pt-2 border-t border-white/5 space-y-1.5">
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-cyan-300 flex items-center gap-1">
-                                <span>⚡ Kỹ năng</span>
+                                <span>⚡ Ability</span>
                             </span>
                             {stats && stats.mana > 0 ? (
                                 <span className="text-[8.5px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-800/40 px-1 py-0.2 rounded">
@@ -580,14 +580,14 @@ function StatPanel({
                                 </span>
                             ) : (
                                 <span className="text-[8.5px] text-gray-500 bg-white/5 px-1 py-0.2 rounded font-mono">
-                                    Nội tại
+                                    Passive
                                 </span>
                             )}
                         </div>
 
                         <div className="bg-black/30 rounded-lg p-2 border border-white/5 space-y-1">
                             <p className="text-[11px] font-bold text-gray-200">
-                                {champ.ability?.name || bisData?.abilityAnalysis?.name || "Kỹ năng"}
+                                {champ.ability?.name || bisData?.abilityAnalysis?.name || "Ability"}
                             </p>
                             
                             {/* Scaling stats tags */}
@@ -603,7 +603,7 @@ function StatPanel({
 
                             {/* Clean description */}
                             <p className="text-[9px] text-gray-400 leading-relaxed max-h-24 overflow-y-auto">
-                                {bisData?.abilityAnalysis?.cleanDescription || champ.ability?.desc || "Chưa có mô tả chi tiết."}
+                                {bisData?.abilityAnalysis?.cleanDescription || champ.ability?.desc || "No detailed description available."}
                             </p>
                         </div>
                     </div>
@@ -613,12 +613,12 @@ function StatPanel({
                 <div className="pt-2 border-t border-white/5 space-y-1.5">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
-                            <span>✨ Trang bị chuẩn (BiS)</span>
+                            <span>✨ Recommended Items (BiS)</span>
                             {bisData?.source === 'jev' && (
                                 <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded font-mono">Jev</span>
                             )}
                         </span>
-                        {bisLoading && <span className="text-[9px] text-gray-500 animate-pulse">Đang tính...</span>}
+                        {bisLoading && <span className="text-[9px] text-gray-500 animate-pulse">Calculating...</span>}
                     </div>
                     {bisData?.recommendedItems && bisData.recommendedItems.length > 0 ? (
                         <div className="space-y-1.5">
@@ -631,7 +631,7 @@ function StatPanel({
                                         key={item.key}
                                         type="button"
                                         onClick={() => onEquipItem?.(item.key)}
-                                        title={`${item.tier || 'BiS'}: ${item.name} (${item.score}★) — Click để trang bị`}
+                                        title={`${item.tier || 'BiS'}: ${item.name} (${item.score}★) — Click to equip`}
                                         className="group relative p-1 rounded bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-400/80 transition flex flex-col items-center cursor-pointer"
                                     >
                                         <img src={getImageUrl(item.iconPath)} alt={item.name} className="w-7 h-7 rounded object-cover" />
@@ -1012,7 +1012,7 @@ function BuilderComponent() {
                         <div className="bg-[#16161f] rounded-2xl border border-amber-500/25 p-3 space-y-2.5">
                             <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                                    <span>✨ AI Đánh giá</span>
+                                    <span>✨ AI Evaluation</span>
                                     {teamCritique?.source === 'jev' && (
                                         <span className="text-[8px] bg-amber-500/20 text-amber-300 px-1 rounded font-mono">Jev</span>
                                     )}
@@ -1022,7 +1022,7 @@ function BuilderComponent() {
                                     disabled={slots.filter(Boolean).length === 0 || critiqueLoading}
                                     className="text-[10px] px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded border border-amber-500/30 transition disabled:opacity-40 cursor-pointer font-semibold"
                                 >
-                                    {critiqueLoading ? "Đang tính..." : "Phân tích"}
+                                    {critiqueLoading ? "Calculating..." : "Analyze"}
                                 </button>
                             </div>
 
@@ -1030,13 +1030,13 @@ function BuilderComponent() {
                                 <div className="space-y-2 text-xs">
                                     <div className="space-y-1 bg-black/30 p-2 rounded-lg border border-white/5">
                                         <div className="flex justify-between items-center text-[10px]">
-                                            <span className="text-gray-400">🛡️ Chống chịu:</span>
+                                            <span className="text-gray-400">🛡️ Frontline:</span>
                                             <span className="text-amber-400 font-mono tracking-widest">
                                                 {"★".repeat(teamCritique.frontlineRating)}{"☆".repeat(3 - teamCritique.frontlineRating)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center text-[10px]">
-                                            <span className="text-gray-400">⚔️ Sát thương:</span>
+                                            <span className="text-gray-400">⚔️ Damage:</span>
                                             <span className="text-amber-400 font-mono tracking-widest">
                                                 {"★".repeat(teamCritique.damageRating)}{"☆".repeat(3 - teamCritique.damageRating)}
                                             </span>
@@ -1045,10 +1045,10 @@ function BuilderComponent() {
 
                                     <div className="flex gap-1 flex-wrap">
                                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${teamCritique.hasArmorShred || teamCritique.hasMagicShred ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
-                                            {teamCritique.hasArmorShred || teamCritique.hasMagicShred ? "✓ Giảm Giáp/KP" : "✗ Thiếu Shred"}
+                                            {teamCritique.hasArmorShred || teamCritique.hasMagicShred ? "✓ Armor/MR Shred" : "✗ Missing Shred"}
                                         </span>
                                         <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${teamCritique.hasAntiHeal ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
-                                            {teamCritique.hasAntiHeal ? "✓ Giảm Hồi Máu" : "✗ Thiếu Vết Thương"}
+                                            {teamCritique.hasAntiHeal ? "✓ Anti-Heal" : "✗ Missing Wound"}
                                         </span>
                                     </div>
 
@@ -1058,7 +1058,7 @@ function BuilderComponent() {
                                 </div>
                             ) : (
                                 <p className="text-[10px] text-gray-500 italic">
-                                    {slots.filter(Boolean).length > 0 ? "Bấm 'Phân tích' để AI đánh giá điểm mạnh/yếu đội hình." : "Đặt tướng lên bàn cờ để AI phân tích."}
+                                    {slots.filter(Boolean).length > 0 ? "Click 'Analyze' for AI team evaluation." : "Place champions on the board to analyze."}
                                 </p>
                             )}
                         </div>

@@ -231,11 +231,11 @@ export function cleanAbilityDescription(rawDesc?: string): string {
     .replace(/<rules>[\s\S]*?<\/rules>/gi, '') // remove rules definitions first
     .replace(/%i:scaleAD%/gi, '[AD]')
     .replace(/%i:scaleAP%/gi, '[AP]')
-    .replace(/%i:scaleAS%/gi, '[Tốc đánh]')
-    .replace(/%i:scaleHealth%/gi, '[Máu]')
-    .replace(/%i:scaleMaxHP%/gi, '[Máu tối đa]')
-    .replace(/%i:scaleArmor%/gi, '[Giáp]')
-    .replace(/%i:scaleMR%/gi, '[Kháng phép]')
+    .replace(/%i:scaleAS%/gi, '[Attack Speed]')
+    .replace(/%i:scaleHealth%/gi, '[Health]')
+    .replace(/%i:scaleMaxHP%/gi, '[Max HP]')
+    .replace(/%i:scaleArmor%/gi, '[Armor]')
+    .replace(/%i:scaleMR%/gi, '[Magic Resist]')
     .replace(/<[^>]+>/g, '') // remove remaining xml/html tags
     .replace(/@([a-zA-Z0-9_]+)(?:\*100)?@/g, '$1') // clean @Damage@ tokens
     .replace(/\s{2,}/g, ' ')
@@ -325,12 +325,12 @@ export function analyzeAbilityScalings(ability?: {
     d.includes('reduce their magic resist')
 
   const scalingTags: string[] = []
-  if (scalesWithAD) scalingTags.push('AD (Vật lý)')
-  if (scalesWithAP) scalingTags.push('AP (SMPT)')
-  if (scalesWithAS) scalingTags.push('Tốc đánh (AS)')
-  if (scalesWithHealth) scalingTags.push('Máu (Health)')
-  if (scalesWithArmor || scalesWithMR) scalingTags.push('Giáp / Kháng phép')
-  if (scalesWithCrit) scalingTags.push('Chí mạng')
+  if (scalesWithAD) scalingTags.push('AD')
+  if (scalesWithAP) scalingTags.push('AP')
+  if (scalesWithAS) scalingTags.push('Attack Speed')
+  if (scalesWithHealth) scalingTags.push('Health')
+  if (scalesWithArmor || scalesWithMR) scalingTags.push('Armor / Magic Resist')
+  if (scalesWithCrit) scalingTags.push('Critical Strike')
 
   const dealsPhysical = d.includes('physical damage')
   const dealsMagic = d.includes('magic damage')

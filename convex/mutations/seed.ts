@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { action, internalMutation } from '../_generated/server'
+import { action, internalMutation, mutation } from '../_generated/server'
 import { internal } from '../_generated/api'
 import { champion, item, trait } from '../schema'
 import { determineChampionRole } from '../optimizerRoles'
@@ -423,7 +423,12 @@ export const insertAll = internalMutation({
         .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', c.key))
         .unique()
       if (existing) {
-        await db.replace(existing._id, payload)
+        // Preserve isLocked if previously set
+        const payloadToUpdate = {
+          ...payload,
+          ...(existing.isLocked !== undefined ? { isLocked: existing.isLocked } : {}),
+        }
+        await db.replace(existing._id, payloadToUpdate)
         championsUpdated++
       } else {
         await db.insert('champions', payload)
@@ -439,7 +444,14 @@ export const insertAll = internalMutation({
         .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', t.key))
         .unique()
       if (existing) {
-        await db.replace(existing._id, payload)
+        // Do not update field unique in traits table (preserve existing.unique and existing.isRegion)
+        const { unique: _tUnique, ...restPayload } = payload as any
+        const payloadToUpdate = {
+          ...restPayload,
+          ...(existing.unique !== undefined ? { unique: existing.unique } : {}),
+          ...(existing.isRegion !== undefined ? { isRegion: existing.isRegion } : {}),
+        }
+        await db.replace(existing._id, payloadToUpdate)
         traitsUpdated++
       } else {
         await db.insert('traits', payload)
@@ -518,6 +530,25 @@ export const markTraitsAsRegion = internalMutation({
         .unique()
       if (trait) {
         await db.patch(trait._id, { isRegion })
+      }
+    }
+  },
+})
+
+export const markTraitsAsUnique = mutation({
+  args: {
+    setKey: v.string(),
+    keys: v.array(v.string()),
+    unique: v.boolean(),
+  },
+  handler: async ({ db }, { setKey, keys, unique }) => {
+    for (const key of keys) {
+      const trait = await db
+        .query('traits')
+        .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', key))
+        .unique()
+      if (trait) {
+        await db.patch(trait._id, { unique })
       }
     }
   },
