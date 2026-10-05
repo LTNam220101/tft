@@ -705,20 +705,50 @@ function HomeComponent() {
                                                     <div className="flex items-center gap-1.5 text-xs font-semibold">
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                                            title="Frontline durability champions (Tank / Bruiser)"
+                                                            title="Dàn Tanker chính (chỉ tính tướng có role main_tank)"
                                                         >
-                                                            🛡️ {team.balance.frontlineCount} Tank
+                                                            🛡️ {team.balance.tankCount} Tank
                                                         </span>
+                                                        {team.balance.bruiserCount > 0 && (
+                                                            <span
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-400 border border-teal-500/20"
+                                                                title="Đấu sĩ cận chiến (Bruiser)"
+                                                            >
+                                                                🪓 {team.balance.bruiserCount} Đấu Sĩ
+                                                            </span>
+                                                        )}
                                                         <span
-                                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                                            title="Primary damage champions (Carry)"
+                                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border ${
+                                                                team.balance.damageFocus === 'ad'
+                                                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                                                    : team.balance.damageFocus === 'ap'
+                                                                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                                                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                                            }`}
+                                                            title={
+                                                                team.balance.damageFocus === 'ad'
+                                                                    ? `Dàn Carry thuần Vật Lý (${team.balance.adCarryCount ?? team.balance.carryCount} AD Carry)`
+                                                                    : team.balance.damageFocus === 'ap'
+                                                                    ? `Dàn Carry thuần Phép Thuật (${team.balance.apCarryCount ?? team.balance.carryCount} AP Carry)`
+                                                                    : 'Dàn Carry hỗn hợp (Cả AD & AP)'
+                                                            }
                                                         >
                                                             ⚔️ {team.balance.carryCount} Carry
+                                                            {team.balance.damageFocus === 'ad' && (
+                                                                <span className="text-[10px] font-extrabold px-1 py-0.2 bg-amber-500/20 text-amber-300 rounded">
+                                                                    AD
+                                                                </span>
+                                                            )}
+                                                            {team.balance.damageFocus === 'ap' && (
+                                                                <span className="text-[10px] font-extrabold px-1 py-0.2 bg-purple-500/20 text-purple-300 rounded">
+                                                                    AP
+                                                                </span>
+                                                            )}
                                                         </span>
                                                         {team.balance.supportCount > 0 && (
                                                             <span
                                                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                                                title="Utility & support champions (Support)"
+                                                                title="Hỗ trợ & Đa dụng (Support)"
                                                             >
                                                                 ✨ {team.balance.supportCount} SP
                                                             </span>

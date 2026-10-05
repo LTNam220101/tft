@@ -136,6 +136,9 @@ export interface CompositionBalance {
   frontlineCount: number
   frontlineScore: number
   carryCount: number
+  adCarryCount: number
+  apCarryCount: number
+  damageFocus: 'ad' | 'ap' | 'mixed' | 'none'
   supportCount: number
   status: CompositionBalanceStatus
 }
@@ -785,7 +788,13 @@ export function determineChampionRole(
 export function getChampionRole(champion: any): ChampionRole {
   if (!champion) return 'carry'
 
-  // Fast-path: use DB-persisted role if present
+  // Primary: derive broad role directly from DB-persisted detailedRole
+  const detailed = champion.detailedRole as DetailedChampionRole | undefined
+  if (detailed && detailed in DETAILED_ROLES_METADATA) {
+    return DETAILED_ROLES_METADATA[detailed].broadRole
+  }
+
+  // Fallback: legacy champion.role if present
   if (
     champion.role === 'tank' ||
     champion.role === 'bruiser' ||
@@ -874,21 +883,39 @@ export function evaluateTeamCompositionBalance(
   let tankCount = 0
   let bruiserCount = 0
   let carryCount = 0
+  let adCarryCount = 0
+  let apCarryCount = 0
   let supportCount = 0
   let highCostTankCount = 0
   let highCostCarryCount = 0
 
   for (const c of team) {
-    const role = getChampionRole(c)
+    const detailedRole = getChampionDetailedRole(c)
     const cost = (c.cost ?? 1) as number
 
-    if (role === 'tank') {
+    // Rule: Dàn tank CHỈ tính những tướng có role main_tank
+    if (detailedRole === 'main_tank') {
       tankCount += 1
       if (cost >= 4) highCostTankCount += 1
-    } else if (role === 'bruiser') {
+    } else if (detailedRole === 'ad_bruiser' || detailedRole === 'ap_bruiser') {
       bruiserCount += 1
-      if (cost >= 4) highCostTankCount += 1
-    } else if (role === 'carry') {
+    } else if (
+      detailedRole === 'ad_auto_carry' ||
+      detailedRole === 'ad_caster_carry' ||
+      detailedRole === 'ad_assassin'
+    ) {
+      carryCount += 1
+      adCarryCount += 1
+      if (cost >= 4) highCostCarryCount += 1
+    } else if (
+      detailedRole === 'ap_burst_caster' ||
+      detailedRole === 'ap_sustained_carry' ||
+      detailedRole === 'ap_assassin'
+    ) {
+      carryCount += 1
+      apCarryCount += 1
+      if (cost >= 4) highCostCarryCount += 1
+    } else if (detailedRole === 'hybrid_carry') {
       carryCount += 1
       if (cost >= 4) highCostCarryCount += 1
     } else {
@@ -896,39 +923,44 @@ export function evaluateTeamCompositionBalance(
     }
   }
 
-  const frontlineScore = tankCount * 1.0 + bruiserCount * 0.8
+  let damageFocus: 'ad' | 'ap' | 'mixed' | 'none' = 'none'
+  if (carryCount > 0) {
+    if (adCarryCount > 0 && apCarryCount === 0) damageFocus = 'ad'
+    else if (apCarryCount > 0 && adCarryCount === 0) damageFocus = 'ap'
+    else if (adCarryCount > 0 && apCarryCount > 0) damageFocus = 'mixed'
+    else damageFocus = 'ad' // fallback for pure hybrid
+  }
+
+  // Dàn tank chính là nòng cốt (1.0), Đấu sĩ hỗ trợ che chắn (0.4)
+  const frontlineScore = tankCount * 1.0 + bruiserCount * 0.4
   let scoreDelta = 0
 
   if (currentSize >= 5) {
-    const minFrontline = targetTeamSize >= 8 ? 2.8 : 2.2
-    const idealFrontlineMin = targetTeamSize >= 8 ? 3.0 : 2.5
-    const idealFrontlineMax = targetTeamSize >= 8 ? 5.2 : 4.5
-
     if (currentSize === targetTeamSize) {
-      // 1. Frontline balance evaluation
-      if (frontlineScore < 1.0) {
-        scoreDelta -= 150 // Critical flaw: virtually zero frontline
-      } else if (frontlineScore < 2.0) {
-        scoreDelta -= 85 // Severe flaw: 1 tank and 7 backline units
-      } else if (frontlineScore < minFrontline) {
-        scoreDelta -= 35 // Deficient frontline for an 8+ unit board
-      } else if (
-        frontlineScore >= idealFrontlineMin &&
-        frontlineScore <= idealFrontlineMax
-      ) {
-        scoreDelta += 30 // Balanced, sturdy frontline
-      } else if (frontlineScore > idealFrontlineMax) {
-        scoreDelta -= 35 // Over-stacked on tanks, lacks damage
+      // 1. Dàn tank (chỉ tính main_tank)
+      if (tankCount === 0) {
+        scoreDelta -= 80 // Lỗi nặng: không có tướng main_tank nào
+      } else if (tankCount >= 2 && tankCount <= 3) {
+        scoreDelta += 25 // Dàn tank lý tưởng (2-3 main_tank)
+      } else if (tankCount > 4) {
+        scoreDelta -= 35 // Quá nhiều tank, thiếu sát thương
       }
 
-      // 2. Active defensive trait synergy
+      // 2. Tuyến đầu tổng thể (Frontline Score)
+      if (frontlineScore < 1.0) {
+        scoreDelta -= 70 // Tuyến đầu quá mỏng
+      } else if (frontlineScore >= 2.0 && frontlineScore <= 4.0) {
+        scoreDelta += 15 // Tuyến trước vững chắc
+      }
+
+      // 3. Active defensive trait synergy
       if (activeDefensiveTraitsCount >= 1) {
         scoreDelta += 15 * Math.min(activeDefensiveTraitsCount, 2)
       } else {
         scoreDelta -= 25 // Zero defensive trait synergy
       }
 
-      // 3. Carry count evaluation
+      // 4. Carry count evaluation
       if (carryCount === 0) {
         scoreDelta -= 90 // No damage dealers
       } else if (carryCount >= targetTeamSize - 1) {
@@ -939,26 +971,43 @@ export function evaluateTeamCompositionBalance(
         scoreDelta += 20 // Ideal carry core
       }
 
-      // 4. Item holder quality (presence of 4-cost or 5-cost anchors)
+      // 5. Carry Damage Type Consistency:
+      // "dàn carry có cùng loại sát thương (cùng là AD hoặc cùng là AP) được ưu tiên hơn"
+      if (carryCount >= 2) {
+        if (damageFocus === 'ad' || damageFocus === 'ap') {
+          scoreDelta += 35 // Ưu tiên cao: thuần AD hoặc thuần AP đồng bộ trang bị & buff
+        } else if (damageFocus === 'mixed') {
+          scoreDelta -= 25 // Phạt khi phân tán sát thương 50/50
+        }
+      } else if (carryCount === 1) {
+        scoreDelta += 10
+      }
+
+      // 6. Item holder quality (presence of 4-cost or 5-cost main_tank anchors)
       if (highCostTankCount > 0) scoreDelta += 10
       if (highCostCarryCount > 0) scoreDelta += 10
     } else {
-      // Intermediate beam step guidance: prevent beam from filling with 100% squishy carries early
-      const frontlineRatio = frontlineScore / currentSize
-      if (frontlineRatio < 0.18) {
-        scoreDelta -= 35
-      } else if (frontlineRatio >= 0.35 && frontlineRatio <= 0.6) {
-        scoreDelta += 12
+      // Intermediate beam step guidance
+      const tankRatio = tankCount / currentSize
+      if (currentSize >= 6 && tankCount === 0) {
+        scoreDelta -= 30
+      } else if (tankRatio >= 0.25 && tankRatio <= 0.5) {
+        scoreDelta += 10
+      }
+
+      // Khuyến khích beam search ưu tiên chọn carry cùng loại sát thương với carry đã có
+      if (adCarryCount > 0 && apCarryCount > 0) {
+        scoreDelta -= 15
+      } else if (carryCount >= 2 && (damageFocus === 'ad' || damageFocus === 'ap')) {
+        scoreDelta += 20
       }
     }
   }
 
   let status: CompositionBalanceStatus = 'balanced'
-  if (frontlineScore < 2.0) {
+  if (tankCount === 0) {
     status = 'critically_low_frontline'
-  } else if (
-    frontlineScore < (targetTeamSize >= 8 ? 2.8 : 2.2)
-  ) {
+  } else if (tankCount < (targetTeamSize >= 8 ? 2 : 1)) {
     status = 'low_frontline'
   } else if (carryCount === 0) {
     status = 'low_damage'
@@ -970,9 +1019,12 @@ export function evaluateTeamCompositionBalance(
     scoreDelta,
     tankCount,
     bruiserCount,
-    frontlineCount: tankCount + bruiserCount,
+    frontlineCount: tankCount, // Dàn tank chỉ tính những con có role main_tank
     frontlineScore,
     carryCount,
+    adCarryCount,
+    apCarryCount,
+    damageFocus,
     supportCount,
     status,
   }

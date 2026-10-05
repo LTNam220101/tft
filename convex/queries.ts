@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, internalQuery } from "./_generated/server";
 import { ACTIVE_SET_KEY } from "./gameConfig";
+import { getChampionRole } from "./optimizerRoles";
 
 export const getChampions = internalQuery({
     args: { setKey: v.string() },
@@ -62,11 +63,16 @@ export const listChampions = query({
             .query("champions")
             .withIndex("by_setKey_and_key", (q) => q.eq("setKey", key))
             .collect();
-        return champions.sort((a, b) => {
-            if ((a.cost ?? 0) !== (b.cost ?? 0)) {
-                return (a.cost ?? 0) - (b.cost ?? 0);
-            }
-            return (a.name ?? "").localeCompare(b.name ?? "");
-        });
+        return champions
+            .map((c) => ({
+                ...c,
+                role: getChampionRole(c),
+            }))
+            .sort((a, b) => {
+                if ((a.cost ?? 0) !== (b.cost ?? 0)) {
+                    return (a.cost ?? 0) - (b.cost ?? 0);
+                }
+                return (a.name ?? "").localeCompare(b.name ?? "");
+            });
     },
 });

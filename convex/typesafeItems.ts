@@ -26,7 +26,7 @@ export interface ChampionItemRecommendationResult {
   roleDescription: string
   damageType: string
   recommendedItems: RecommendedItem[]
-  source: 'jev' | 'heuristic'
+  source: 'jev' | 'heuristic' | 'profile'
   abilityAnalysis?: {
     name?: string
     desc?: string
@@ -235,7 +235,6 @@ export const recommendItemsForChampion = action({
       desc: champ.ability?.desc,
       ability: champ.ability,
       traits: enrichedTraits,
-      rawRole: champ.rawRole,
       stats: champ.stats,
     })
 

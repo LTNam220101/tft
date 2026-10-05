@@ -2,7 +2,7 @@ import { v } from 'convex/values'
 import { action, internalMutation, mutation } from '../_generated/server'
 import { internal } from '../_generated/api'
 import { champion, item, trait } from '../schema'
-import { determineChampionRole } from '../optimizerRoles'
+import { profileChampionKit } from '../optimizerRoles'
 
 /**
  * Community Dragon patch folder (e.g. 17.1). Change when the client ships Set 17 data.
@@ -239,18 +239,12 @@ export const seedFromApi = action({
       .filter((c) => CHAMPION_PATH_PREFIXES.some((p) => c.path?.startsWith(p)))
       .map((c) => {
         const cd = cdragonChampMap.get(c.character_id)
-        const traits = (c.traits || []).map((t) => t.name)
-        const range = cd?.stats?.range ?? 1
-        const desc = cd?.ability?.desc ?? ''
-        const role = determineChampionRole(c.display_name, cd?.role, desc, range, traits)
         const ability = cleanAbility(cd?.ability)
 
         return {
           key: c.character_id,
           name: c.display_name,
           cost: c.tier,
-          role,
-          rawRole: cd?.role ?? undefined,
           traits: c.traits || [],
           iconPath: c.squareIconPath,
           path: c.path,
@@ -423,15 +417,23 @@ export const insertAll = internalMutation({
         .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', c.key))
         .unique()
       if (existing) {
-        // Preserve isLocked if previously set
+        // Do NOT update field detailedRole when updating existing champions (preserve existing)
         const payloadToUpdate = {
           ...payload,
           ...(existing.isLocked !== undefined ? { isLocked: existing.isLocked } : {}),
+          ...(existing.detailedRole !== undefined ? { detailedRole: existing.detailedRole } : {}),
         }
+        delete (payloadToUpdate as any).role
+        delete (payloadToUpdate as any).rawRole
         await db.replace(existing._id, payloadToUpdate)
         championsUpdated++
       } else {
-        await db.insert('champions', payload)
+        // Newly inserted champion: assign initial detailedRole via deterministic profiler
+        const initialProfile = profileChampionKit(c)
+        await db.insert('champions', {
+          ...payload,
+          detailedRole: initialProfile.detailedRole,
+        })
         championsInserted++
       }
     }

@@ -1,15 +1,12 @@
 import { v } from 'convex/values'
-import { action, internalMutation } from './_generated/server'
+import { action, internalMutation, mutation } from './_generated/server'
 import { internal } from './_generated/api'
 import { ACTIVE_SET_KEY } from './gameConfig'
-import { callJevSystemOne, type ChoiceAnswer, type NoulAnswer } from './typesafe'
 import {
   type ChampionRole,
   type DetailedChampionRole,
   type AbilityScalingInfo,
   type ChampionTraitProfile,
-  cleanAbilityDescription,
-  DETAILED_ROLES_METADATA,
   profileChampionKit,
 } from './optimizerRoles'
 
@@ -19,7 +16,7 @@ export interface ChampionTraitInfo {
   description?: string
 }
 
-export interface JevRoleClassification {
+export interface ChampionRoleClassification {
   role: ChampionRole
   detailedRole: DetailedChampionRole
   roleNameVi: string
@@ -30,16 +27,14 @@ export interface JevRoleClassification {
   spellCasterScore: number
   summary: string
   confidence: number
-  source: 'jev' | 'heuristic'
+  source: 'profile'
   abilityAnalysis?: AbilityScalingInfo
 }
 
 /**
- * Classifies a champion's tactical role using TypeSafe AI Jev (System One),
- * deeply evaluating the champion's ability description, stat scalings (AD, AP, Health, Armor),
- * traits and trait descriptions (e.g. attack speed, mana generation, damage reduction),
- * and attack patterns (Auto-Attack Carries vs Spell Caster Carries).
- * Falls back to deterministic mathematical profiling if Jev is unavailable.
+ * Classifies a champion's tactical role using deterministic kit profiling,
+ * evaluating ability descriptions, stat scalings (AD, AP, Health, Armor),
+ * traits and trait descriptions, and attack patterns.
  */
 export async function classifyChampionRole(champ: {
   name: string
@@ -55,7 +50,7 @@ export async function classifyChampionRole(champ: {
     icon?: string
     variables?: Array<{ name: string; value: number[] }>
   }
-}): Promise<JevRoleClassification> {
+}): Promise<ChampionRoleClassification> {
   const rawTraits: ChampionTraitInfo[] =
     champ.traits || (champ.traitNames || []).map((name) => ({ name }))
   const resolvedTraitProfiles: ChampionTraitProfile[] = rawTraits.map((t) => ({
@@ -68,113 +63,7 @@ export async function classifyChampionRole(champ: {
     ...champ,
     traits: resolvedTraitProfiles,
   })
-  const abilityAnalysis = profileHint.abilityAnalysis
 
-  const state = {
-    champion: {
-      name: champ.name,
-      attackRange: champ.range ?? 1,
-      stats: champ.stats,
-      ability: champ.ability ? {
-        name: champ.ability.name,
-        description: abilityAnalysis?.cleanDescription || champ.ability.desc,
-        scalingStats: abilityAnalysis?.scalingTags ?? [],
-        primaryScaling: abilityAnalysis?.primaryScalingStat ?? 'Utility',
-        hasShieldOrHeal: abilityAnalysis?.hasShieldOrHeal ?? false,
-        hasCrowdControl: abilityAnalysis?.hasCrowdControl ?? false,
-        hasShredOrBurn: (abilityAnalysis?.hasBurnOrWound || abilityAnalysis?.hasShredOrSunder) ?? false,
-      } : champ.desc ? {
-        description: abilityAnalysis?.cleanDescription || champ.desc,
-        scalingStats: abilityAnalysis?.scalingTags ?? [],
-      } : undefined,
-      traits: resolvedTraitProfiles.map((t) => ({
-        name: t.name,
-        description: t.description ? cleanAbilityDescription(t.description) : undefined,
-      })),
-      riotRawRole: champ.rawRole ?? undefined,
-      autoAttackScore: profileHint.autoAttackScore,
-      spellCasterScore: profileHint.spellCasterScore,
-      heuristicHint: profileHint.detailedRole,
-    },
-  }
-
-  const questions = {
-    detailedRole: {
-      type: 'choice' as const,
-      instructions:
-        'What is this TFT champion\'s exact combat role and damage delivery pattern, considering their stats, traits (including trait descriptions), and ability scalings?',
-      criteria: {
-        ad_auto_carry:
-          'Ranged physical carry whose DPS primarily comes from basic attacks, attack speed scaling, on-hit effects, or crit (e.g. Jinx, Ashe, Tristana).',
-        ad_caster_carry:
-          'Ranged physical carry whose damage comes mainly from casting high-impact physical spells; ability scales with AD/Crit and relies on mana/Shojin (e.g. Jhin, Ezreal).',
-        ap_burst_caster:
-          'Ranged magic carry that deals massive burst spell damage upon casting, scaling heavily with AP (e.g. Ahri, Lux, Syndra, Teemo).',
-        ap_sustained_carry:
-          'Ranged magic carry that deals continuous damage through high attack speed, on-hit magic attacks, or rapid casting (e.g. Azir, Kayle, TF).',
-        ad_bruiser:
-          'Melee physical fighter with high durability, omnivamp, and sustained frontline brawling (e.g. Sett, Vi, Warwick).',
-        ap_bruiser:
-          'Melee magic fighter with shields, survivability, and sustained AP brawling (e.g. Diana, Mordekaiser).',
-        main_tank:
-          'Primary frontline damage sponge focused on pure defensive stats (HP, Armor, MR, Shields) to survive as long as possible; ability scales with Health/Armor/MR.',
-        off_tank:
-          'Secondary frontline tank that applies disruption, aura items, anti-heal burn, or armor/MR shred.',
-        ad_assassin:
-          'Melee physical assassin who dives the backline for rapid single-target burst elimination.',
-        ap_assassin:
-          'Melee magic assassin who dives the backline for rapid magic burst elimination.',
-        hybrid_carry:
-          'Carries whose abilities or traits scale equally well with both physical AD and magical AP.',
-        utility_support:
-          'Support champion whose ability provides healing, shields, buffs, or team crowd control rather than personal carry damage.',
-      },
-    },
-    isFrontline: {
-      type: 'noul' as const,
-      instructions:
-        'Should this champion normally be positioned in the frontline (first 2 rows) on the TFT board?',
-      criteria: {
-        true: 'Yes, unit has short range (<=2 hexes) or high tankiness/defensive stats/shields.',
-        false: 'No, unit is backline ranged carry or fragile caster.',
-      },
-    },
-  }
-
-  const jevResponse = await callJevSystemOne(state, questions)
-
-  if (jevResponse && jevResponse.answers.detailedRole) {
-    const roleAns = jevResponse.answers.detailedRole as ChoiceAnswer
-    const frontlineAns = jevResponse.answers.isFrontline as NoulAnswer
-
-    const detailedRole =
-      (roleAns.choice as DetailedChampionRole) in DETAILED_ROLES_METADATA
-        ? (roleAns.choice as DetailedChampionRole)
-        : profileHint.detailedRole
-
-    const meta = DETAILED_ROLES_METADATA[detailedRole]
-    const isFrontline =
-      frontlineAns?.probability !== undefined
-        ? frontlineAns.probability >= 0.5
-        : profileHint.isFrontline
-
-    return {
-      role: meta.broadRole,
-      detailedRole,
-      roleNameVi: meta.nameVi,
-      roleIcon: meta.icon,
-      primaryDamage: meta.damageType,
-      isFrontline,
-      autoAttackScore: profileHint.autoAttackScore,
-      spellCasterScore: profileHint.spellCasterScore,
-      summary: meta.description,
-      confidence: roleAns.confidence ?? 0.9,
-      source: 'jev',
-      abilityAnalysis,
-    }
-  }
-
-  // Graceful fallback to deterministic mathematical profiler
   return {
     role: profileHint.broadRole,
     detailedRole: profileHint.detailedRole,
@@ -185,14 +74,14 @@ export async function classifyChampionRole(champ: {
     autoAttackScore: profileHint.autoAttackScore,
     spellCasterScore: profileHint.spellCasterScore,
     summary: profileHint.summary,
-    confidence: 0.85,
-    source: 'heuristic',
-    abilityAnalysis,
+    confidence: 1.0,
+    source: 'profile',
+    abilityAnalysis: profileHint.abilityAnalysis,
   }
 }
 
 /**
- * Public action to evaluate a champion role using Jev or mathematical profiling.
+ * Public action to evaluate a champion role using kit profiling.
  */
 export const classifyChampion = action({
   args: {
@@ -242,7 +131,6 @@ export const classifyChampion = action({
       desc: champ.ability?.desc,
       ability: champ.ability,
       traits: enrichedTraits,
-      rawRole: champ.rawRole,
       stats: champ.stats,
     })
   },
@@ -251,21 +139,22 @@ export const classifyChampion = action({
 export const updateRole = internalMutation({
   args: {
     id: v.id('champions'),
-    role: v.union(
-      v.literal('tank'),
-      v.literal('bruiser'),
-      v.literal('carry'),
-      v.literal('support'),
-    ),
-    detailedRole: v.optional(v.string()),
+    detailedRole: v.string(),
   },
-  handler: async ({ db }, { id, role, detailedRole }) => {
-    await db.patch(id, { role, detailedRole })
+  handler: async ({ db }, { id, detailedRole }) => {
+    const doc = await db.get(id)
+    if (doc) {
+      const { role: _r, rawRole: _rr, ...rest } = doc as any
+      await db.replace(id, {
+        ...rest,
+        detailedRole,
+      })
+    }
   },
 })
 
 /**
- * Batch classifies all champions in active set and updates roles in the database.
+ * Batch classifies all champions in active set and updates detailedRole in the database.
  */
 export const batchClassifyAllRoles = action({
   args: {},
@@ -308,14 +197,12 @@ export const batchClassifyAllRoles = action({
         desc: champ.ability?.desc,
         ability: champ.ability,
         traits: enrichedTraits,
-        rawRole: champ.rawRole,
         stats: champ.stats,
       })
 
-      if (champ.role !== res.role || champ.detailedRole !== res.detailedRole) {
+      if (champ.detailedRole !== res.detailedRole || 'role' in champ || 'rawRole' in champ) {
         await ctx.runMutation(internal.typesafeRoles.updateRole, {
           id: champ._id,
-          role: res.role,
           detailedRole: res.detailedRole,
         })
         updatedCount++
@@ -325,6 +212,41 @@ export const batchClassifyAllRoles = action({
     return {
       total: champions.length,
       updatedCount,
+    }
+  },
+})
+
+/**
+ * Mutation to consolidate role columns in DB:
+ * Keeps detailedRole (populating via profiler if missing), and removes role & rawRole.
+ */
+export const consolidateRoleColumns = mutation({
+  args: {
+    setKey: v.optional(v.string()),
+  },
+  handler: async ({ db }, { setKey }) => {
+    const key = setKey ?? ACTIVE_SET_KEY
+    const champions = await db
+      .query('champions')
+      .withIndex('by_setKey_and_key', (q) => q.eq('setKey', key))
+      .collect()
+
+    let updated = 0
+    for (const champ of champions) {
+      const { role: _r, rawRole: _rr, ...cleanDoc } = champ as any
+      const detailedRole =
+        cleanDoc.detailedRole || profileChampionKit(champ).detailedRole
+
+      await db.replace(champ._id, {
+        ...cleanDoc,
+        detailedRole,
+      })
+      updated++
+    }
+
+    return {
+      total: champions.length,
+      updated,
     }
   },
 })

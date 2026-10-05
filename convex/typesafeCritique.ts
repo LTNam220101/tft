@@ -8,6 +8,7 @@ import {
   type NoulAnswer,
   type ScoreAnswer,
 } from './typesafe'
+import { getChampionRole } from './optimizerRoles'
 
 export interface TeamCritiqueResult {
   frontlineRating: number // 1 to 3
@@ -71,7 +72,7 @@ export const critiqueTeamComposition = action({
         key,
         name: champ?.name || key,
         cost: champ?.cost ?? 1,
-        role: champ?.role ?? 'carry',
+        role: getChampionRole(champ),
         traits: (champ?.traits || []).map((t: any) => t.name),
         equippedItems,
       }
