@@ -61,7 +61,12 @@ All fields are `v.optional(...)` to support multi-set data in the same tables. D
 - `convex/optimizerMissFortune.ts` — Set 17 special case: Miss Fortune's traits are optional based on selected emblems.
 - `convex/mutations/seed.ts` — Seeds all game data from Community Dragon. Run manually to refresh data for a new patch.
 - `src/routes/index.tsx` — The entire UI (~660 lines). Single-page optimizer: emblem picker, team size, champion forced/blocked lists, results grid with hover interactions.
+- `src/routes/builder.tsx` — Team builder. The hex board is `src/arena/BuilderBoard3D.tsx` (3D models; picker cards and items still use HTML drag-and-drop onto the canvas, board units are dragged inside the scene).
 - `src/traitTooltip.ts` — Decodes trait description templates from game data (replaces `@variable@` placeholders).
+- `src/routes/roll.tsx` — Comp roll mini-game (`/roll`): builder-style setup (up to 10 champions, each with a target star), in-game style shop HUD, comp tracker, hotkeys (D/F/E). `?comp=KEY.STAR,...` pre-fills the setup (builder's "Roll this comp" link; codec in `src/rollGame/compParam.ts`). Loads the three.js scene lazily on the client.
+- `src/rollGame/engine.ts` — Pure shop simulation: Set 18 shop odds per level, pool sizes per cost, XP curve, buy/sell/combine rules (`buyPlan`: on a full bench one click also buys the second shop copy that completes a 2★), comp targets (`targetDone` per unit, `win` when all are done). Update these tables when a new set changes them.
+- `src/arena/scene.ts` — Shared three.js arena (`ArenaScene`): `"arena"` layout for `/roll` (both halves + bench), `"board"` layout for the builder (player 4×7 only). Units load animated champion models from `public/models/<setKey>/<championKey>.glb` (idle/celebration clips; one shared scale, shrunk to fit a hex when wider) and fall back to a portrait token when a model is missing. OrbitControls: drag empty space to rotate, wheel/pinch to zoom, `resetCamera()`; presses on units drag the unit instead. `unitAnchors()` positions HTML overlays.
+- `scripts/tft-models/` — Builds those `.glb` files straight from Riot's patcher CDN (no game install). Re-run after a model-changing patch or a set switch; see its README.
 
 ## Environment Variables
 

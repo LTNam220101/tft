@@ -6,6 +6,8 @@ import { api } from "../../convex/_generated/api";
 import { ACTIVE_SET_KEY } from "../../convex/gameConfig";
 import { getImageUrl } from "~/utils";
 import { buildTraitTooltipRows } from "../traitTooltip";
+import { BuilderBoard3D } from "~/arena/BuilderBoard3D";
+import { encodeComp } from "~/rollGame/compParam";
 
 const TITLE = "TFT Team Builder — T-Flex-T"
 const DESCRIPTION = "Build and simulate TFT team compositions on a hex board — place champions, equip items, and track active trait synergies in real time."
@@ -25,14 +27,6 @@ export const Route = createFileRoute("/builder")({
     }),
     component: BuilderComponent,
 });
-
-// ── Hex geometry (pointy-top) ────────────────────────────────────────────────
-const HEX_W = 72;
-const HEX_H = 82;
-const HEX_GAP = 4;
-const HEX_ROW_OFFSET = Math.round((HEX_W + HEX_GAP) / 2);
-const HEX_ROW_OVERLAP = Math.round(HEX_H * 0.25);
-const HEX_CLIP = "polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)";
 
 const COST_BORDERS: Record<number, string> = {
     1: "#6b7280",
@@ -190,110 +184,6 @@ function TraitTooltipPortal({ t, anchorRect }: { t: ActiveTrait; anchorRect: DOM
 
     if (typeof document === "undefined") return null;
     return createPortal(panel, document.body);
-}
-
-// ── HexSlot ───────────────────────────────────────────────────────────────────
-// Items are displayed inside the rectangular zone of the hex (no clipping issues).
-// Items positioned at bottom:26px, name at bottom:44px — both in the y<75% zone.
-function HexSlot({
-    champKey, champByKey, equippedItemKeys, itemsByKey,
-    isSelected, dropHint,
-    onClick, onItemRemove, onItemIconDragStart,
-    onChampDragStart,
-    onDragOver, onDragLeave, onDrop,
-}: {
-    champKey: string | null;
-    champByKey: Map<string, any>;
-    equippedItemKeys: string[];
-    itemsByKey: Map<string, any>;
-    isSelected: boolean;
-    dropHint: "champion" | "item" | null; // type of drag currently hovering
-    onClick: () => void;
-    onItemRemove: (slotIdx: number) => void;
-    onItemIconDragStart: (e: React.DragEvent, itemKey: string, fromChampKey: string) => void;
-    onChampDragStart: (e: React.DragEvent) => void;
-    onDragOver: (e: React.DragEvent) => void;
-    onDragLeave: (e: React.DragEvent) => void;
-    onDrop: (e: React.DragEvent) => void;
-}) {
-    const champ = champKey ? champByKey.get(champKey) : null;
-
-    const outerBg = dropHint === "champion"
-        ? champ ? "#d97706" : "#3b82f6"
-        : dropHint === "item"
-            ? "#22c55e"
-            : champ ? costBorder(champ.cost) : "rgba(255,255,255,0.08)";
-
-    return (
-        <div
-            style={{ width: HEX_W, height: HEX_H, position: "relative", cursor: "pointer", flexShrink: 0 }}
-            draggable={!!champ}
-            onClick={onClick}
-            onDragStart={onChampDragStart}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-        >
-            {/* Border (clipped) */}
-            <div style={{ position: "absolute", inset: 0, clipPath: HEX_CLIP, background: outerBg, transition: "background 0.1s" }} />
-            {/* Fill (clipped) */}
-            <div style={{ position: "absolute", inset: 2, clipPath: HEX_CLIP, overflow: "hidden", background: "#0c0c14" }}>
-                {champ && (
-                    <img
-                        src={getImageUrl(champ.iconPath)} alt={champ.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }}
-                    />
-                )}
-            </div>
-            {/* Selected tint */}
-            {isSelected && champ && (
-                <div style={{ position: "absolute", inset: 2, clipPath: HEX_CLIP, background: "rgba(251,191,36,0.25)", pointerEvents: "none" }} />
-            )}
-            {/* Champion name — at ~y=55% (in rectangular zone, always full width) */}
-            {champ && (
-                <div style={{
-                    position: "absolute", bottom: 42, left: 0, right: 0,
-                    textAlign: "center", fontSize: 8, fontWeight: 700,
-                    color: "#fff", textShadow: "0 0 5px #000, 0 1px 3px #000",
-                    pointerEvents: "none", padding: "0 4px",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
-                    {champ.name}
-                </div>
-            )}
-            {/* Equipped items — at ~y=72% (rectangular zone, before bottom triangle) */}
-            {champ && equippedItemKeys.length > 0 && (
-                <div style={{
-                    position: "absolute", bottom: 26, left: 0, right: 0,
-                    display: "flex", justifyContent: "center", gap: 2,
-                }}>
-                    {equippedItemKeys.slice(0, 3).map((ik, i) => {
-                        const it = itemsByKey.get(ik);
-                        return it ? (
-                            <img
-                                key={i}
-                                src={getImageUrl(it.iconPath)}
-                                alt={it.name}
-                                draggable
-                                title={`${it.name} — click to remove`}
-                                onDragStart={e => {
-                                    e.stopPropagation();
-                                    onItemIconDragStart(e, ik, champKey!);
-                                }}
-                                onClick={e => { e.stopPropagation(); onItemRemove(i); }}
-                                style={{
-                                    width: 14, height: 14, borderRadius: 2, cursor: "pointer",
-                                    border: "1px solid rgba(255,255,255,0.45)",
-                                    boxShadow: "0 1px 4px rgba(0,0,0,0.7)",
-                                    objectFit: "cover",
-                                }}
-                            />
-                        ) : null;
-                    })}
-                </div>
-            )}
-        </div>
-    );
 }
 
 // ── ChampCard (bottom units picker) ──────────────────────────────────────────
@@ -747,6 +637,8 @@ function BuilderComponent() {
         }, 0);
     }, [slots, champByKey]);
     const boardChampKeys = useMemo(() => new Set(slots.filter(Boolean) as string[]), [slots]);
+    // Stars set here become the roll targets; unset ones default to 2★.
+    const rollComp = encodeComp([...boardChampKeys].map((key) => ({ key, star: champStars[key] ?? 2 })));
 
     const selectedChamp = selectedKey ? champByKey.get(selectedKey) ?? null : null;
     const selectedStar  = (selectedKey ? champStars[selectedKey] : null) ?? 1 as 1 | 2 | 3;
@@ -882,29 +774,38 @@ function BuilderComponent() {
     function handleHexDragOver(e: React.DragEvent, idx: number) {
         const p = dragRef.current;
         if (!p) return;
-        if (p.kind === "champion") {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-            setDragOverHex(idx);
-        } else if (p.kind === "item" && slots[idx] !== null) {
-            const destChampKey = slots[idx]!;
+        const destKey = slots[idx];
+        let accepts = p.kind === "champion";
+        if (p.kind === "item" && destKey) {
+            // Emblems are refused by champions that already have the trait.
             const item = itemsByKey.get(p.itemKey);
-            if (item?.isEmblem) {
-                const traitKey = getEmblemTraitKey(item, traitByName);
-                if (traitKey && champHasTraitNatively(destChampKey, traitKey, champByKey)) {
-                    return; // cursor shows no-drop; drop will be ignored
-                }
-            }
+            const traitKey = item?.isEmblem ? getEmblemTraitKey(item, traitByName) : null;
+            accepts = !(traitKey && champHasTraitNatively(destKey, traitKey, champByKey));
+        }
+        if (accepts) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
             setDragOverHex(idx);
+        } else {
+            // Empty hex for an item, or an emblem the champion already has: no-drop cursor, no highlight.
+            setDragOverHex(null);
         }
     }
 
-    function handleHexDragLeave(e: React.DragEvent) {
-        if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
-            setDragOverHex(null);
-        }
+    /** Move a champion between hexes (swapping with any occupant) or place it from the picker. */
+    function placeChampion(champKey: string, fromHexIdx: number | null, idx: number) {
+        setSlots(prev => {
+            const next = [...prev];
+            if (fromHexIdx !== null) {
+                next[fromHexIdx] = next[idx] ?? null;
+                next[idx] = champKey;
+            } else {
+                const existingIdx = next.indexOf(champKey);
+                if (existingIdx !== -1) next[existingIdx] = null;
+                next[idx] = champKey;
+            }
+            return next;
+        });
     }
 
     function handleHexDrop(e: React.DragEvent, idx: number) {
@@ -913,21 +814,7 @@ function BuilderComponent() {
         if (!p) return;
 
         if (p.kind === "champion") {
-            const { champKey, fromHexIdx } = p;
-            setSlots(prev => {
-                const next = [...prev];
-                if (fromHexIdx !== null) {
-                    // Move: swap if destination occupied
-                    next[fromHexIdx] = next[idx] ?? null;
-                    next[idx] = champKey;
-                } else {
-                    // Place from picker
-                    const existingIdx = next.indexOf(champKey);
-                    if (existingIdx !== -1) next[existingIdx] = null;
-                    next[idx] = champKey;
-                }
-                return next;
-            });
+            placeChampion(p.champKey, p.fromHexIdx, idx);
         } else if (p.kind === "item") {
             const { itemKey, fromChampKey } = p;
             const destChampKey = slots[idx];
@@ -1072,63 +959,44 @@ function BuilderComponent() {
                                     Board <span className="text-amber-400 font-mono">{boardCount}</span>
                                     <span className="text-gray-600"> / 10</span>
                                 </span>
-                                <button
-                                    onClick={() => { setSlots(Array(28).fill(null)); setSelectedKey(null); setChampItems({}); setChampStars({}); }}
-                                    className="text-xs text-gray-600 hover:text-red-400 transition-colors"
-                                >
-                                    Clear
-                                </button>
-                            </div>
-
-                            {/* Hex grid — row 0 (back row) drawn first, but visually "highest" z-index */}
-                            <div className="overflow-x-auto pb-1">
-                                <div style={{ display: "inline-block", padding: 4 }}>
-                                    {[0, 1, 2, 3].map(row => (
-                                        <div
-                                            key={row}
-                                            style={{
-                                                display: "flex",
-                                                gap: HEX_GAP,
-                                                marginTop: row > 0 ? -HEX_ROW_OVERLAP : 0,
-                                                marginLeft: row % 2 === 1 ? HEX_ROW_OFFSET : 0,
-                                                position: "relative",
-                                                // Earlier rows on top so items at bottom of hex appear above next row
-                                                zIndex: 4 - row,
-                                            }}
-                                        >
-                                            {[0, 1, 2, 3, 4, 5, 6].map(col => {
-                                                const idx = row * 7 + col;
-                                                const champKey = slots[idx];
-                                                const isOver = dragOverHex === idx;
-                                                const hint: "champion" | "item" | null =
-                                                    isOver && dragKind ? dragKind : null;
-                                                return (
-                                                    <HexSlot
-                                                        key={idx}
-                                                        champKey={champKey}
-                                                        champByKey={champByKey}
-                                                        equippedItemKeys={champKey ? (champItems[champKey] ?? []) : []}
-                                                        itemsByKey={itemsByKey}
-                                                        isSelected={champKey !== null && champKey === selectedKey}
-                                                        dropHint={hint}
-                                                        onClick={() => handleHexClick(idx)}
-                                                        onItemRemove={(slotIdx) => champKey && removeItemFromChamp(champKey, slotIdx)}
-                                                        onItemIconDragStart={(e, itemKey, fromChampKey) =>
-                                                            startDrag(e, { kind: "item", itemKey, fromChampKey })
-                                                        }
-                                                        onChampDragStart={(e) => champKey &&
-                                                            startDrag(e, { kind: "champion", champKey, fromHexIdx: idx })
-                                                        }
-                                                        onDragOver={(e) => handleHexDragOver(e, idx)}
-                                                        onDragLeave={handleHexDragLeave}
-                                                        onDrop={(e) => handleHexDrop(e, idx)}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    ))}
+                                <div className="flex items-center gap-3">
+                                    <Link
+                                        to="/roll"
+                                        search={{ comp: rollComp }}
+                                        disabled={boardChampKeys.size === 0}
+                                        className={`text-xs font-bold transition-colors ${boardChampKeys.size === 0 ? "pointer-events-none text-gray-700" : "text-amber-400 hover:text-amber-300"}`}
+                                    >
+                                        Roll this comp →
+                                    </Link>
+                                    <button
+                                        onClick={() => { setSlots(Array(28).fill(null)); setSelectedKey(null); setChampItems({}); setChampStars({}); }}
+                                        className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                                    >
+                                        Clear
+                                    </button>
                                 </div>
                             </div>
+
+                            <BuilderBoard3D
+                                slots={slots}
+                                champByKey={champByKey}
+                                champStars={champStars}
+                                champItems={champItems}
+                                itemsByKey={itemsByKey}
+                                selectedKey={selectedKey}
+                                dropHint={dragOverHex !== null && dragKind ? { idx: dragOverHex, kind: dragKind } : null}
+                                onHexClick={handleHexClick}
+                                onBackgroundClick={() => setSelectedKey(null)}
+                                onMove={(fromIdx, toIdx) => {
+                                    const key = slots[fromIdx];
+                                    if (key) placeChampion(key, fromIdx, toIdx);
+                                }}
+                                onHexDragOver={handleHexDragOver}
+                                onHexDrop={handleHexDrop}
+                                onDragLeaveBoard={() => setDragOverHex(null)}
+                                onItemRemove={removeItemFromChamp}
+                                onItemDragStart={(e, itemKey, fromChampKey) => startDrag(e, { kind: "item", itemKey, fromChampKey })}
+                            />
 
                             {/* Cost legend */}
                             <div className="flex gap-3 mt-2 px-1">

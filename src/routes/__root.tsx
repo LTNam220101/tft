@@ -147,6 +147,12 @@ function NavHeader() {
           >
             Builder
           </Link>
+          <Link
+            to="/roll"
+            className="px-3 py-1 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-all [&.active]:text-amber-400 [&.active]:bg-amber-500/10"
+          >
+            Roll
+          </Link>
         </nav>
         {/* <form onSubmit={handleSearch} className="ml-auto flex items-center gap-2">
           <input

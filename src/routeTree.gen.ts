@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BuilderRouteImport } from './routes/builder'
+import { Route as RollRouteImport } from './routes/roll'
 import { Route as PlayerNameTagRouteImport } from './routes/player.$name.$tag'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const BuilderRoute = BuilderRouteImport.update({
   path: '/builder',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RollRoute = RollRouteImport.update({
+  id: '/roll',
+  path: '/roll',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlayerNameTagRoute = PlayerNameTagRouteImport.update({
   id: '/player/$name/$tag',
   path: '/player/$name/$tag',
@@ -32,30 +38,34 @@ const PlayerNameTagRoute = PlayerNameTagRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/builder': typeof BuilderRoute
+  '/roll': typeof RollRoute
   '/player/$name/$tag': typeof PlayerNameTagRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/builder': typeof BuilderRoute
+  '/roll': typeof RollRoute
   '/player/$name/$tag': typeof PlayerNameTagRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/builder': typeof BuilderRoute
+  '/roll': typeof RollRoute
   '/player/$name/$tag': typeof PlayerNameTagRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/builder' | '/player/$name/$tag'
+  fullPaths: '/' | '/builder' | '/roll' | '/player/$name/$tag'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/builder' | '/player/$name/$tag'
-  id: '__root__' | '/' | '/builder' | '/player/$name/$tag'
+  to: '/' | '/builder' | '/roll' | '/player/$name/$tag'
+  id: '__root__' | '/' | '/builder' | '/roll' | '/player/$name/$tag'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BuilderRoute: typeof BuilderRoute
+  RollRoute: typeof RollRoute
   PlayerNameTagRoute: typeof PlayerNameTagRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BuilderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/roll': {
+      id: '/roll'
+      path: '/roll'
+      fullPath: '/roll'
+      preLoaderRoute: typeof RollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/player/$name/$tag': {
       id: '/player/$name/$tag'
       path: '/player/$name/$tag'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BuilderRoute: BuilderRoute,
+  RollRoute: RollRoute,
   PlayerNameTagRoute: PlayerNameTagRoute,
 }
 export const routeTree = rootRouteImport
