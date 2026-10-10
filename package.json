@@ -23,7 +23,8 @@
     "convex": "^1.31.0",
     "nitro": "^3.0.1-alpha.1",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^1.1.1",
@@ -31,6 +32,7 @@
     "@tanstack/eslint-config": "^0.3.2",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^5.0.3",
     "concurrently": "~9.2.1",
     "prettier": "^3.6.2",
