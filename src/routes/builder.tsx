@@ -8,6 +8,7 @@ import { getImageUrl } from "~/utils";
 import { buildTraitTooltipRows } from "../traitTooltip";
 import { BuilderBoard3D } from "~/arena/BuilderBoard3D";
 import { encodeComp } from "~/rollGame/compParam";
+import { AugmentsModal } from "../AugmentsModal";
 
 const TITLE = "TFT Team Builder — T-Flex-T"
 const DESCRIPTION = "Build and simulate TFT team compositions on a hex board — place champions, equip items, and track active trait synergies in real time."
@@ -186,6 +187,95 @@ function TraitTooltipPortal({ t, anchorRect }: { t: ActiveTrait; anchorRect: DOM
     return createPortal(panel, document.body);
 }
 
+// ── ItemTooltipPortal ──────────────────────────────────────────────────────────
+function ItemTooltipPortal({
+    item,
+    anchorRect,
+    allItems,
+}: {
+    item: any;
+    anchorRect: DOMRect;
+    allItems: any[];
+}) {
+    const fxSummary = formatItemEffects(item.effects);
+    const comps = useMemo(() => {
+        if (!item.composition || item.composition.length < 2) return null;
+        const itemMap = new Map<string, any>();
+        for (const it of allItems) {
+            if (it.key) itemMap.set(it.key, it);
+            if (it.nameId) itemMap.set(it.nameId, it);
+        }
+        return [
+            itemMap.get(item.composition[0]) || null,
+            itemMap.get(item.composition[1]) || null,
+        ];
+    }, [item.composition, allItems]);
+
+    const style: CSSProperties = {
+        position: "fixed",
+        left: Math.max(12, Math.min(anchorRect.left - 100, window.innerWidth - 320)),
+        bottom: window.innerHeight - anchorRect.top + 8,
+        zIndex: 2147483647,
+    };
+
+    const typeBadge = item.isComponent
+        ? { label: "Component", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" }
+        : item.itemType === "radiant"
+        ? { label: "Radiant", cls: "bg-amber-400/20 text-amber-300 border-amber-400/40" }
+        : item.itemType === "artifact"
+        ? { label: "Artifact", cls: "bg-orange-500/20 text-orange-300 border-orange-500/40" }
+        : item.itemType === "emblem"
+        ? { label: "Emblem", cls: "bg-purple-500/20 text-purple-300 border-purple-500/40" }
+        : { label: "Completed", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" };
+
+    const panel = (
+        <div
+            className="pointer-events-none w-72 rounded-xl border border-white/15 bg-[#07070c]/98 p-3 text-left text-xs leading-snug text-gray-200 shadow-2xl ring-1 ring-white/10 backdrop-blur-md space-y-2 animate-fadeIn"
+            role="tooltip"
+            style={style}
+        >
+            <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+                <img src={getImageUrl(item.iconPath)} alt={item.name} className="w-8 h-8 rounded-lg object-cover border border-white/15" />
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-gray-100 truncate">{item.name}</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded border font-mono ${typeBadge.cls}`}>
+                            {typeBadge.label}
+                        </span>
+                    </div>
+                    {fxSummary && <p className="text-[10px] text-amber-400/90 font-mono mt-0.5">{fxSummary}</p>}
+                </div>
+            </div>
+
+            {item.desc && (
+                <p className="text-[10px] text-gray-300 leading-relaxed whitespace-pre-line">
+                    {item.desc}
+                </p>
+            )}
+
+            {comps && comps[0] && comps[1] && (
+                <div className="pt-1 border-t border-white/10">
+                    <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-1 font-semibold">Recipe / Cách ghép:</p>
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 rounded-lg border border-white/5">
+                        <div className="flex items-center gap-1 min-w-0 flex-1">
+                            <img src={getImageUrl(comps[0].iconPath)} alt={comps[0].name} className="w-5 h-5 rounded object-cover shrink-0" />
+                            <span className="text-[10px] text-gray-300 truncate">{comps[0].name}</span>
+                        </div>
+                        <span className="text-gray-500 text-xs font-bold">+</span>
+                        <div className="flex items-center gap-1 min-w-0 flex-1">
+                            <img src={getImageUrl(comps[1].iconPath)} alt={comps[1].name} className="w-5 h-5 rounded object-cover shrink-0" />
+                            <span className="text-[10px] text-gray-300 truncate">{comps[1].name}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    if (typeof document === "undefined") return null;
+    return createPortal(panel, document.body);
+}
+
 // ── ChampCard (bottom units picker) ──────────────────────────────────────────
 function ChampCard({
     champ, isOnBoard, isSelected,
@@ -248,22 +338,34 @@ function formatItemEffects(effects?: Record<string, number>): string {
 }
 
 // ── ItemCard (bottom items picker) ────────────────────────────────────────────
-function ItemCard({ item, onDragStart }: { item: any; onDragStart: (e: React.DragEvent) => void }) {
-    const fxSummary = formatItemEffects(item.effects);
-    const tooltip = fxSummary ? `${item.name}\n${fxSummary}` : item.name;
+function ItemCard({
+    item,
+    onDragStart,
+    onHoverStart,
+    onHoverEnd,
+}: {
+    item: any;
+    onDragStart: (e: React.DragEvent) => void;
+    onHoverStart?: (item: any, rect: DOMRect) => void;
+    onHoverEnd?: () => void;
+}) {
     return (
         <div
             className="relative cursor-grab active:cursor-grabbing group"
             draggable
             onDragStart={onDragStart}
-            title={tooltip}
+            onMouseEnter={e => onHoverStart?.(item, e.currentTarget.getBoundingClientRect())}
+            onMouseLeave={onHoverEnd}
         >
             <img
                 src={getImageUrl(item.iconPath)} alt={item.name}
-                className="w-10 h-10 rounded-lg object-cover border border-white/10 group-hover:border-white/35 transition-all group-hover:scale-105"
+                className="w-10 h-10 rounded-lg object-cover border border-white/10 group-hover:border-amber-400/50 transition-all group-hover:scale-105"
             />
             {item.isEmblem && (
-                <div className="absolute top-0 right-0 w-2 h-2 bg-amber-400 rounded-bl-sm" />
+                <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-amber-400 rounded-bl-sm" />
+            )}
+            {item.isComponent && (
+                <div className="absolute top-0 left-0 w-2.5 h-2.5 bg-blue-400 rounded-br-sm" />
             )}
         </div>
     );
@@ -287,8 +389,8 @@ function calcStats(
     const base = champ?.stats;
     if (!base) return null;
 
-    const scaledHp = (base.hp ?? 0) * HP_MULT[star];
-    const scaledAd = (base.damage ?? 0) * AD_MULT[star];
+    const scaledHp = base.hpPerStar?.[star - 1] ?? ((base.hp ?? 0) * HP_MULT[star]);
+    const scaledAd = base.damagePerStar?.[star - 1] ?? ((base.damage ?? 0) * AD_MULT[star]);
 
     let adPct = 0;    // fractional — 0.10 = +10% of scaled base AD
     let hpFlat = 0;
@@ -415,6 +517,32 @@ function StatPanel({
                     ))}
                 </div>
 
+                {/* Star scaling progression for HP & AD */}
+                {champ.stats?.hpPerStar && champ.stats?.damagePerStar && (
+                    <div className="bg-black/40 rounded-xl p-2 border border-white/5 space-y-1">
+                        <div className="flex justify-between items-center text-[9.5px]">
+                            <span className="text-gray-400 font-medium">HP (1★/2★/3★):</span>
+                            <div className="flex gap-1 font-mono text-[10px]">
+                                {champ.stats.hpPerStar.slice(0, 3).map((val: number, idx: number) => (
+                                    <span key={idx} className={star === idx + 1 ? "font-bold text-red-400 bg-red-500/20 px-1 rounded" : "text-gray-500"}>
+                                        {val}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[9.5px]">
+                            <span className="text-gray-400 font-medium">AD (1★/2★/3★):</span>
+                            <div className="flex gap-1 font-mono text-[10px]">
+                                {champ.stats.damagePerStar.slice(0, 3).map((val: number, idx: number) => (
+                                    <span key={idx} className={star === idx + 1 ? "font-bold text-orange-400 bg-orange-500/20 px-1 rounded" : "text-gray-500"}>
+                                        {val}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Stats */}
                 {!stats ? (
                     <p className="text-[10px] text-gray-600 italic text-center py-2">
@@ -492,8 +620,8 @@ function StatPanel({
                             )}
 
                             {/* Clean description */}
-                            <p className="text-[9px] text-gray-400 leading-relaxed max-h-24 overflow-y-auto">
-                                {bisData?.abilityAnalysis?.cleanDescription || champ.ability?.desc || "No detailed description available."}
+                            <p className="text-[9.5px] text-gray-300 leading-relaxed max-h-32 overflow-y-auto whitespace-pre-line bg-black/20 p-2 rounded border border-white/5">
+                                {champ.ability?.formattedDesc || bisData?.abilityAnalysis?.cleanDescription || champ.ability?.desc || "No detailed description available."}
                             </p>
                         </div>
                     </div>
@@ -570,6 +698,8 @@ function BuilderComponent() {
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [champStars, setChampStars] = useState<Record<string, 1 | 2 | 3>>({});
     const [traitTooltip, setTraitTooltip] = useState<{ t: ActiveTrait; anchorRect: DOMRect } | null>(null);
+    const [itemTooltip, setItemTooltip] = useState<{ item: any; anchorRect: DOMRect } | null>(null);
+    const [showAugmentsModal, setShowAugmentsModal] = useState(false);
 
     const handleEquipItem = (itemKey: string) => {
         if (!selectedKey) return;
@@ -596,15 +726,18 @@ function BuilderComponent() {
     };
 
     useEffect(() => {
-        if (!traitTooltip) return;
-        const clear = () => setTraitTooltip(null);
+        if (!traitTooltip && !itemTooltip) return;
+        const clear = () => {
+            setTraitTooltip(null);
+            setItemTooltip(null);
+        };
         window.addEventListener("scroll", clear, true);
         window.addEventListener("resize", clear);
         return () => {
             window.removeEventListener("scroll", clear, true);
             window.removeEventListener("resize", clear);
         };
-    }, [traitTooltip]);
+    }, [traitTooltip, itemTooltip]);
 
     // ── Units picker ─────────────────────────────────────────────────────────
     const [champSearch, setChampSearch]     = useState("");
@@ -614,7 +747,7 @@ function BuilderComponent() {
 
     // ── Items picker ─────────────────────────────────────────────────────────
     const [itemSearch, setItemSearch]           = useState("");
-    const [itemTypeFilter, setItemTypeFilter]   = useState<"all" | "normal" | "emblem" | "radiant" | "artifact">("all");
+    const [itemTypeFilter, setItemTypeFilter]   = useState<"all" | "component" | "normal" | "emblem" | "radiant" | "artifact">("all");
 
     // ── Upgrade ──────────────────────────────────────────────────────────────
     const [targetLevel, setTargetLevel]     = useState(9);
@@ -670,11 +803,11 @@ function BuilderComponent() {
         let list = allItems;
         if (itemTypeFilter !== "all") {
             list = list.filter(i => {
-                if (i.itemType) return i.itemType === itemTypeFilter;
-                if (itemTypeFilter === "emblem") return i.isEmblem;
-                if (itemTypeFilter === "radiant") return i.name?.toLowerCase().includes("radiant");
-                if (itemTypeFilter === "artifact") return i.nameId?.toLowerCase().includes("artifact");
-                if (itemTypeFilter === "normal") return !i.isEmblem && !i.name?.toLowerCase().includes("radiant") && !i.nameId?.toLowerCase().includes("artifact");
+                if (itemTypeFilter === "component") return i.isComponent || i.itemType === "component";
+                if (itemTypeFilter === "emblem") return i.isEmblem || i.itemType === "emblem";
+                if (itemTypeFilter === "radiant") return i.itemType === "radiant" || i.name?.toLowerCase().includes("radiant");
+                if (itemTypeFilter === "artifact") return i.itemType === "artifact" || i.nameId?.toLowerCase().includes("artifact");
+                if (itemTypeFilter === "normal") return !i.isComponent && !i.isEmblem && i.itemType !== "radiant" && i.itemType !== "artifact" && !i.name?.toLowerCase().includes("radiant") && !i.nameId?.toLowerCase().includes("artifact");
                 return true;
             });
         }
@@ -867,11 +1000,20 @@ function BuilderComponent() {
         <div className="min-h-screen bg-[#0a0a0f] text-gray-100" onDragEnd={endDrag}>
             <div className="max-w-[1440px] mx-auto p-4 space-y-4">
 
-                {/* Breadcrumb */}
-                <div className="flex items-center gap-2 text-sm">
-                    <Link to="/" className="text-gray-500 hover:text-amber-400 transition-colors">Optimizer</Link>
-                    <span className="text-gray-700">/</span>
-                    <span className="text-gray-300 font-semibold">Team Builder</span>
+                {/* Breadcrumb & Actions */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm">
+                        <Link to="/" className="text-gray-500 hover:text-amber-400 transition-colors">Optimizer</Link>
+                        <span className="text-gray-700">/</span>
+                        <span className="text-gray-300 font-semibold">Team Builder (Set 18)</span>
+                    </div>
+
+                    <button
+                        onClick={() => setShowAugmentsModal(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-fuchsia-500/20 hover:from-amber-500/30 hover:to-fuchsia-500/30 text-amber-300 rounded-xl border border-amber-500/30 transition shadow-sm hover:shadow cursor-pointer text-xs font-semibold"
+                    >
+                        <span>✨ Set 18 Augments (Lõi)</span>
+                    </button>
                 </div>
 
                 {/* ── TOP ROW: Traits + Board ─────────────────────────────── */}
@@ -1198,11 +1340,18 @@ function BuilderComponent() {
                             </div>
                         </div>
                         {/* Type filter tabs */}
-                        <div className="flex gap-1 mb-3">
-                            {(["all", "normal", "emblem", "radiant", "artifact"] as const).map(t => (
-                                <button key={t} onClick={() => setItemTypeFilter(t)}
-                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize border transition-all ${itemTypeFilter === t ? "bg-white/15 border-white/30 text-white" : "border-white/5 text-gray-500 hover:text-gray-300"}`}>
-                                    {t}
+                        <div className="flex gap-1 mb-3 overflow-x-auto pb-0.5 custom-scrollbar">
+                            {[
+                                { key: "all", label: "All" },
+                                { key: "component", label: "Components" },
+                                { key: "normal", label: "Completed" },
+                                { key: "emblem", label: "Emblems" },
+                                { key: "radiant", label: "Radiant" },
+                                { key: "artifact", label: "Artifacts" },
+                            ].map(t => (
+                                <button key={t.key} onClick={() => setItemTypeFilter(t.key as any)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold capitalize border shrink-0 transition-all ${itemTypeFilter === t.key ? "bg-white/15 border-white/30 text-white" : "border-white/5 text-gray-500 hover:text-gray-300"}`}>
+                                    {t.label}
                                 </button>
                             ))}
                         </div>
@@ -1215,6 +1364,8 @@ function BuilderComponent() {
                                         key={item.key}
                                         item={item}
                                         onDragStart={e => startDrag(e, { kind: "item", itemKey: item.key!, fromChampKey: null })}
+                                        onHoverStart={(it, rect) => setItemTooltip({ item: it, anchorRect: rect })}
+                                        onHoverEnd={() => setItemTooltip(null)}
                                     />
                                 ))}
                             </div>
@@ -1230,6 +1381,18 @@ function BuilderComponent() {
                     anchorRect={traitTooltip.anchorRect}
                 />
             )}
+            {itemTooltip && (
+                <ItemTooltipPortal
+                    key={`it-${itemTooltip.item.key}`}
+                    item={itemTooltip.item}
+                    anchorRect={itemTooltip.anchorRect}
+                    allItems={allItems}
+                />
+            )}
+            <AugmentsModal
+                isOpen={showAugmentsModal}
+                onClose={() => setShowAugmentsModal(false)}
+            />
         </div>
     );
 }

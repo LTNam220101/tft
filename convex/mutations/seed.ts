@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 import { action, internalMutation, mutation } from '../_generated/server'
 import { internal } from '../_generated/api'
-import { champion, item, trait } from '../schema'
+import { champion, item, trait, augment } from '../schema'
 import { profileChampionKit } from '../optimizerRoles'
 
 /**
@@ -26,7 +26,7 @@ const SET_TRAITS_FILTER = 'TFTSet18'
 const TEAMUP_TRAIT_ID_PREFIX = 'TFT18_Teamup_'
 
 /** tftitems nameId prefixes for set-scoped items. */
-const ITEM_NAMEID_PREFIXES = ['DA_', 'TFT18_'] as const
+const ITEM_NAMEID_PREFIXES = ['DA_', 'TFT18_', 'TFT_Item_'] as const
 
 /**
  * Trait display names that count as "regions" for World Runes mode (`isRegion`) and UI.
@@ -61,6 +61,20 @@ interface RawTrait {
   }>
 }
 
+/** Standard TFT Component stat bonuses */
+const CANONICAL_COMPONENT_EFFECTS: Record<string, Record<string, number>> = {
+  bfsword: { AD: 0.1 },
+  recurvebow: { AS: 10 },
+  needlesslylargerod: { AP: 10 },
+  tearofthegoddess: { Mana: 15, ManaRegen: 1 },
+  chainvest: { Armor: 20 },
+  negatroncloak: { MagicResist: 20 },
+  giantsbelt: { Health: 150 },
+  sparringgloves: { CritChance: 20 },
+  spatula: {},
+  fryingpan: {},
+}
+
 /** Remove null/undefined entries from a flat number record (for item effects). */
 function filterNullRecord(obj: Record<string, number | null | undefined> | undefined): Record<string, number> | undefined {
   if (!obj) return undefined
@@ -79,6 +93,126 @@ function stripNulls<T extends object>(obj: T | undefined): { [K in keyof T]?: Ex
   ) as { [K in keyof T]?: Exclude<T[K], null> }
 }
 
+/** Formats champion ability descriptions across star levels and cleans tags */
+function formatAbilityDesc(
+  desc?: string,
+  variables?: Array<{ name: string; value: number[] }>
+): string {
+  if (!desc) return ''
+  let s = desc
+  const varMap = new Map<string, number[]>()
+  if (Array.isArray(variables)) {
+    for (const v of variables) {
+      if (v?.name && Array.isArray(v.value)) {
+        varMap.set(v.name.toLowerCase(), v.value)
+      }
+    }
+  }
+
+  s = s.replace(/@([a-zA-Z0-9_]+)(?:\*([0-9.]+))?@/g, (match, varName, mult) => {
+    const valArr = varMap.get(varName.toLowerCase())
+    if (valArr && valArr.length > 1) {
+      const multiplier = mult ? parseFloat(mult) : 1
+      const stars = [1, 2, 3].map((starIdx) => {
+        const val = starIdx < valArr.length ? valArr[starIdx] : valArr[valArr.length - 1]
+        return Math.round(val * multiplier * 10) / 10
+      })
+      if (stars[0] === stars[1] && stars[1] === stars[2]) {
+        return String(stars[0])
+      }
+      return stars.join(' / ')
+    }
+    return match
+  })
+
+  s = s
+    .replace(/%i:scaleAP%/g, 'AP')
+    .replace(/%i:scaleAD%/g, 'AD')
+    .replace(/%i:scaleHealth%/g, 'HP')
+    .replace(/%i:scaleArmor%/g, 'Armor')
+    .replace(/%i:scaleMR%/g, 'Magic Resist')
+    .replace(/%i:scaleAS%/g, 'Attack Speed')
+    .replace(/%i:scaleCrit%/g, 'Crit Chance')
+    .replace(/%i:scaleCritMult%/g, 'Crit Damage')
+    .replace(/%i:scaleMana%/g, 'Mana')
+    .replace(/%i:scaleDR%/g, 'Damage Reduction')
+    .replace(/%i:scaleDA%/g, 'Damage Amp')
+
+  s = s.replace(/<\/?(?:row|expandRow)>/gi, '\n')
+  s = s.replace(/<br\s*\/?>/gi, '\n')
+  s = s.replace(/<[^>]+>/g, '')
+
+  return s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** Formats item and augment descriptions, substituting tokens with effects values */
+function formatItemDescription(
+  desc?: string,
+  effects: Record<string, number> = {}
+): string {
+  if (!desc) return ''
+  let s = desc
+
+  s = s.replace(/@([a-zA-Z0-9_]+)(?:\*([0-9.]+))?@/g, (match, varName, multiplier) => {
+    let val = effects[varName]
+    if (val === undefined) {
+      const lower = varName.toLowerCase()
+      for (const [k, v] of Object.entries(effects)) {
+        if (k.toLowerCase() === lower) {
+          val = v
+          break
+        }
+      }
+    }
+    if (val !== undefined && typeof val === 'number') {
+      if (multiplier) {
+        val = Math.round(val * parseFloat(multiplier) * 10) / 10
+      } else {
+        val = Math.round(val * 100) / 100
+      }
+      return String(val)
+    }
+    return match
+  })
+
+  s = s
+    .replace(/%i:scaleAP%/g, 'AP')
+    .replace(/%i:scaleAD%/g, 'AD')
+    .replace(/%i:scaleHealth%/g, 'HP')
+    .replace(/%i:scaleArmor%/g, 'Armor')
+    .replace(/%i:scaleMR%/g, 'Magic Resist')
+    .replace(/%i:scaleAS%/g, 'Attack Speed')
+    .replace(/%i:scaleCrit%/g, 'Crit Chance')
+    .replace(/%i:scaleCritMult%/g, 'Crit Damage')
+    .replace(/%i:scaleMana%/g, 'Mana')
+    .replace(/%i:scaleDR%/g, 'Damage Reduction')
+    .replace(/%i:scaleDA%/g, 'Damage Amp')
+
+  s = s.replace(/<\/?(?:row|expandRow)>/gi, '\n')
+  s = s.replace(/<br\s*\/?>/gi, '\n')
+  s = s.replace(/<[^>]+>/g, '')
+
+  return s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** Classifies augment tier: 1 (Silver), 2 (Gold), 3 (Prismatic) */
+function getAugmentTier(aug: { icon?: string; apiName?: string }): number {
+  const icon = (aug.icon || '').toLowerCase()
+  const apiName = (aug.apiName || '').toLowerCase()
+  if (icon.includes('-i.') || icon.includes('_i.') || apiName.endsWith('1') || apiName.includes('tier1') || icon.includes('t1')) return 1
+  if (icon.includes('-ii.') || icon.includes('_ii.') || apiName.endsWith('2') || apiName.includes('tier2') || icon.includes('t2')) return 2
+  if (icon.includes('-iii.') || icon.includes('_iii.') || apiName.endsWith('3') || apiName.includes('tier3') || icon.includes('t3') || icon.includes('prismatic')) return 3
+  return 2
+}
+
 /** Sanitize champion ability data from CommunityDragon */
 function cleanAbility(ability?: {
   name?: string
@@ -90,11 +224,14 @@ function cleanAbility(ability?: {
   const cleaned: {
     name?: string
     desc?: string
+    formattedDesc?: string
     icon?: string
     variables?: Array<{ name: string; value: number[] }>
   } = {}
   if (ability.name) cleaned.name = ability.name
-  if (ability.desc) cleaned.desc = ability.desc
+  if (ability.desc) {
+    cleaned.desc = ability.desc
+  }
   if (ability.icon) cleaned.icon = ability.icon
   if (Array.isArray(ability.variables) && ability.variables.length > 0) {
     const vars = ability.variables
@@ -104,6 +241,9 @@ function cleanAbility(ability?: {
         value: v.value!.filter((n) => typeof n === 'number'),
       }))
     if (vars.length > 0) cleaned.variables = vars
+  }
+  if (cleaned.desc) {
+    cleaned.formattedDesc = formatAbilityDesc(cleaned.desc, cleaned.variables)
   }
   return Object.keys(cleaned).length > 0 ? cleaned : undefined
 }
@@ -155,9 +295,13 @@ interface CdragonChampion {
 interface CdragonItem {
   apiName: string
   name?: string
+  desc?: string
+  icon?: string
   effects?: Record<string, number>
   tags?: string[]
   isAugment?: boolean
+  composition?: string[]
+  associatedTraits?: string[]
 }
 
 
@@ -168,6 +312,8 @@ type UpsertStats = {
   traitsUpdated: number
   itemsInserted: number
   itemsUpdated: number
+  augmentsInserted: number
+  augmentsUpdated: number
 }
 
 // Action that fetches data from Community Dragon API and seeds the database
@@ -177,6 +323,7 @@ export const seedFromApi = action({
     champions: number
     traits: number
     items: number
+    augments: number
   } & UpsertStats> => {
     const [championsJson, traitsJson, itemsJson, cdragonJson] = await Promise.all([
       fetch(`${BASE}/tftchampions-teamplanner.json`).then((r) => r.json()),
@@ -187,8 +334,8 @@ export const seedFromApi = action({
 
     // Build lookup maps from cdragon data
     const cdragon = cdragonJson as {
-      sets?: Record<string, { champions?: CdragonChampion[] }>
-      setData?: Array<{ mutator?: string; number?: number; champions?: CdragonChampion[] }>
+      sets?: Record<string, { champions?: CdragonChampion[]; augments?: string[] }>
+      setData?: Array<{ mutator?: string; number?: number; champions?: CdragonChampion[]; augments?: string[] }>
       items?: CdragonItem[]
     }
     const set18Champions: CdragonChampion[] =
@@ -240,6 +387,22 @@ export const seedFromApi = action({
       .map((c) => {
         const cd = cdragonChampMap.get(c.character_id)
         const ability = cleanAbility(cd?.ability)
+        const rawStats = cd?.stats
+        let statsPayload: Record<string, any> | undefined
+
+        if (rawStats) {
+          const cleanBase = stripNulls(rawStats) ?? {}
+          const hp = typeof cleanBase.hp === 'number' && cleanBase.hp > 0 ? cleanBase.hp : undefined
+          const damage = typeof cleanBase.damage === 'number' && cleanBase.damage > 0 ? cleanBase.damage : undefined
+          const hpPerStar = hp ? [hp, Math.round(hp * 1.8), Math.round(hp * 3.24), Math.round(hp * 5.832)] : undefined
+          const damagePerStar = damage ? [damage, Math.round(damage * 1.5), Math.round(damage * 2.25), Math.round(damage * 3.375)] : undefined
+
+          statsPayload = {
+            ...cleanBase,
+            ...(hpPerStar ? { hpPerStar } : {}),
+            ...(damagePerStar ? { damagePerStar } : {}),
+          }
+        }
 
         return {
           key: c.character_id,
@@ -248,7 +411,7 @@ export const seedFromApi = action({
           traits: c.traits || [],
           iconPath: c.squareIconPath,
           path: c.path,
-          stats: stripNulls(cd?.stats),
+          stats: statsPayload,
           ability,
         }
       })
@@ -287,8 +450,11 @@ export const seedFromApi = action({
       name: string
       nameId: string
       iconPath: string
-      itemType: 'normal' | 'emblem' | 'radiant' | 'artifact'
+      desc?: string
+      itemType: 'normal' | 'component' | 'emblem' | 'radiant' | 'artifact'
       isEmblem: boolean
+      isComponent: boolean
+      composition?: string[]
       effects?: Record<string, number>
     }> = []
 
@@ -300,29 +466,36 @@ export const seedFromApi = action({
       const nameId = raw.nameId
       const icon = raw.squareIconPath || ''
 
-      // Skip non-equipable game items: recipes, placeholders, consumables, potions, boosters, wands/zaps, augments, components
+      // Skip non-equipable game items: recipes, placeholders, consumables, potions, boosters, wands/zaps, augments
       if (name.includes('Recipe') || nameId.includes('Recipe') || nameId.includes('_Placeholder')) continue
       if (nameId.includes('Consumable') || nameId.includes('Booster') || nameId.includes('Potion')) continue
       if (nameId.includes('Upgrade') || nameId.includes('Prismatic') || icon.includes('/ZAPS/Wands/')) continue
       if (icon.includes('/Augments/') || nameId.includes('Augment') || nameId.includes('TraitAugment')) continue
-      if (nameId.includes('Component')) continue
       if (nameId.includes('Radiantize') || nameId.includes('Artifactinate') || nameId.includes('Chest')) continue
 
       const cd = cdItemMap.get(nameId)
       const tags = cd?.tags ?? []
-      if (tags.includes('Consumable') || tags.includes('component')) continue
+      if (tags.includes('Consumable')) continue
 
-      let itemType: 'normal' | 'emblem' | 'radiant' | 'artifact' | null = null
+      const isComponent =
+        tags.includes('component') ||
+        nameId.startsWith('DA_Component_') ||
+        (nameId.startsWith('TFT_Item_') &&
+          ['BFSword', 'ChainVest', 'GiantsBelt', 'NeedlesslyLargeRod', 'NegatronCloak', 'RecurveBow', 'SparringGloves', 'Spatula', 'TearOfTheGoddess', 'FryingPan'].includes(nameId.replace('TFT_Item_', '')))
+
+      let itemType: 'normal' | 'component' | 'emblem' | 'radiant' | 'artifact' | null = null
       let isEmblem = false
 
-      if (name.includes('Emblem') || nameId.includes('Emblem') || tags.includes('{ebcd1bac}')) {
+      if (isComponent) {
+        itemType = 'component'
+      } else if (name.includes('Emblem') || nameId.includes('Emblem') || tags.includes('{ebcd1bac}')) {
         itemType = 'emblem'
         isEmblem = true
       } else if (name.toLowerCase().includes('radiant') || nameId.toLowerCase().includes('radiant') || tags.includes('{6ef5c598}')) {
         itemType = 'radiant'
       } else if (nameId.toLowerCase().includes('artifact') || tags.includes('{44ace175}')) {
         itemType = 'artifact'
-      } else if (tags.includes('{7ea41d13}') || name.includes('Tactician')) {
+      } else if (tags.includes('{7ea41d13}') || name.includes('Tactician') || (cd?.composition && cd.composition.length === 2)) {
         itemType = 'normal'
       }
 
@@ -333,12 +506,21 @@ export const seedFromApi = action({
       seenItemKeys.add(key)
 
       // Resolve item effects:
-      // Direct on DA_ item first
+      // Direct on item first
       let rawEffects = (cd?.effects && Object.keys(cd?.effects).length > 0) ? cd.effects : undefined
 
-      // Fallback: look up canonical item stats by normalized name (for non-emblems to avoid obsolete set trait stats)
+      // Fallback: look up canonical item stats by normalized name
       if (!rawEffects && !isEmblem) {
         rawEffects = effectMapByName.get(norm(name))
+      }
+
+      // Fallback: check canonical component effects if it is a component
+      if (isComponent && (!rawEffects || Object.keys(rawEffects).length === 0)) {
+        const compNormalized = norm(name)
+        const canonicalComp = CANONICAL_COMPONENT_EFFECTS[compNormalized]
+        if (canonicalComp) {
+          rawEffects = canonicalComp
+        }
       }
 
       // Fallback: look up by artifact/radiant apiName conversions
@@ -355,14 +537,61 @@ export const seedFromApi = action({
         }
       }
 
+      const filteredEffects = filterNullRecord(rawEffects)
+      const desc = formatItemDescription(cd?.desc, filteredEffects ?? {})
+      const composition = cd?.composition && cd.composition.length === 2 ? cd.composition : undefined
+
       items.push({
         key,
         name,
         nameId,
         iconPath: icon,
+        desc: desc || undefined,
         itemType,
         isEmblem,
-        effects: filterNullRecord(rawEffects),
+        isComponent,
+        composition,
+        effects: filteredEffects,
+      })
+    }
+
+    // Extract Set 18 Augments
+    const set18AugmentKeys: string[] =
+      cdragon.sets?.['18']?.augments ??
+      cdragon.setData?.find((s) => s.mutator === 'TFTSet18' || s.number === 18)?.augments ??
+      []
+
+    const seenAugmentKeys = new Set<string>()
+    const augments: Array<{
+      key: string
+      name: string
+      desc?: string
+      iconPath?: string
+      tier: number
+      associatedTraits?: string[]
+      effects?: Record<string, number>
+    }> = []
+
+    for (const augKey of set18AugmentKeys) {
+      if (seenAugmentKeys.has(augKey)) continue
+      seenAugmentKeys.add(augKey)
+
+      const cd = cdItemMap.get(augKey)
+      if (!cd || !cd.name) continue
+
+      const tier = getAugmentTier(cd)
+      const effects = filterNullRecord(cd.effects)
+      const desc = formatItemDescription(cd.desc, effects ?? {})
+      const iconPath = cd.icon ? cd.icon.replace(/\.tex$/i, '.png') : undefined
+
+      augments.push({
+        key: cd.apiName || augKey,
+        name: cd.name,
+        desc: desc || undefined,
+        iconPath,
+        tier,
+        associatedTraits: cd.associatedTraits?.length ? cd.associatedTraits : undefined,
+        effects,
       })
     }
 
@@ -372,6 +601,7 @@ export const seedFromApi = action({
         champions,
         traits,
         items,
+        augments,
         setKey: SET_TRAITS_FILTER,
       },
     )
@@ -380,6 +610,7 @@ export const seedFromApi = action({
       champions: champions.length,
       traits: traits.length,
       items: items.length,
+      augments: augments.length,
       ...stats,
     }
   },
@@ -391,6 +622,7 @@ export const insertAll = internalMutation({
     champions: v.array(champion),
     traits: v.array(trait),
     items: v.array(item),
+    augments: v.array(augment),
     setKey: v.string(),
   },
   returns: v.object({
@@ -400,14 +632,18 @@ export const insertAll = internalMutation({
     traitsUpdated: v.number(),
     itemsInserted: v.number(),
     itemsUpdated: v.number(),
+    augmentsInserted: v.number(),
+    augmentsUpdated: v.number(),
   }),
-  handler: async ({ db }, { champions, traits, items, setKey }) => {
+  handler: async ({ db }, { champions, traits, items, augments, setKey }) => {
     let championsInserted = 0
     let championsUpdated = 0
     let traitsInserted = 0
     let traitsUpdated = 0
     let itemsInserted = 0
     let itemsUpdated = 0
+    let augmentsInserted = 0
+    let augmentsUpdated = 0
 
     for (const c of champions) {
       if (!c.key) continue
@@ -489,6 +725,34 @@ export const insertAll = internalMutation({
       }
     }
 
+    const validAugmentKeys = new Set<string>()
+    for (const a of augments) {
+      if (!a.key) continue
+      validAugmentKeys.add(a.key)
+      const payload = { ...a, setKey }
+      const existing = await db
+        .query('augments')
+        .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey).eq('key', a.key))
+        .unique()
+      if (existing) {
+        await db.replace(existing._id, payload)
+        augmentsUpdated++
+      } else {
+        await db.insert('augments', payload)
+        augmentsInserted++
+      }
+    }
+
+    const existingAugments = await db
+      .query('augments')
+      .withIndex('by_setKey_and_key', (q) => q.eq('setKey', setKey))
+      .collect()
+    for (const ex of existingAugments) {
+      if (ex.key && !validAugmentKeys.has(ex.key)) {
+        await db.delete(ex._id)
+      }
+    }
+
     return {
       championsInserted,
       championsUpdated,
@@ -496,6 +760,8 @@ export const insertAll = internalMutation({
       traitsUpdated,
       itemsInserted,
       itemsUpdated,
+      augmentsInserted,
+      augmentsUpdated,
     }
   },
 })
